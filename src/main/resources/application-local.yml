@@ -4,6 +4,9 @@ spring:
     username: ${DB_USERNAME:sonulim}
     password: ${DB_PASSWORD:sonulim}
   jpa:
+    hibernate:
+      # 임시: Flyway 마이그레이션 도입 전까지만 사용. 전환 시 validate로 바꾸고 마이그레이션 스크립트로 대체한다.
+      ddl-auto: update
     properties:
       hibernate:
         format_sql: true
