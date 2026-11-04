@@ -1,0 +1,35 @@
+name: "[FEAT] 기능 추가"
+description: 새 기능을 구현한다
+title: "[FEAT] "
+labels: ["feat"]
+body:
+  - type: dropdown
+    id: domain
+    attributes:
+      label: 도메인
+      options:
+        - account
+        - link
+        - messaging
+        - recipient
+        - signal
+        - location
+        - history
+        - vibration
+        - settings
+        - global
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: 설명
+      description: 관련 기능ID(기능명세서) 또는 API 엔드포인트를 함께 적어주세요.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 완료 조건
+    validations:
+      required: false

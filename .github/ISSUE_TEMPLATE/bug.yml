@@ -1,0 +1,40 @@
+name: "[BUG] 버그 리포트"
+description: 예상과 다르게 동작하는 부분을 보고한다
+title: "[BUG] "
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: domain
+    attributes:
+      label: 도메인
+      options:
+        - account
+        - link
+        - messaging
+        - recipient
+        - signal
+        - location
+        - history
+        - vibration
+        - settings
+        - global
+    validations:
+      required: true
+  - type: textarea
+    id: current
+    attributes:
+      label: 현재 동작
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 기대 동작
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: 재현 방법
+    validations:
+      required: false

@@ -1,0 +1,11 @@
+name: "[CHORE] 잡무성 변경"
+description: 빌드/설정/문서 등 코드 동작과 무관한 변경
+title: "[CHORE] "
+labels: ["chore"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: 설명
+    validations:
+      required: true
