@@ -1,0 +1,9 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:${DB_PORT:5433}/${DB_NAME:sonulim}
+    username: ${DB_USERNAME:sonulim}
+    password: ${DB_PASSWORD:sonulim}
+  jpa:
+    properties:
+      hibernate:
+        format_sql: true
