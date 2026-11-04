@@ -16,9 +16,3 @@ sonulim:
     refresh-expiration-seconds: ${JWT_REFRESH_EXPIRATION_SECONDS:2592000}
   firebase:
     credentials-path: ${FIREBASE_CREDENTIALS_PATH:}
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info
