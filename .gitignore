@@ -35,3 +35,6 @@ Thumbs.db
 
 ### Env ###
 .env
+
+### Local-only planning docs (not shared to the team repo) ###
+docs/superpowers/
