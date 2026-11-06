@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.UUID;
 
 import com.sonulim.global.BaseEntity;
+import com.sonulim.global.exception.ErrorCode;
+import com.sonulim.global.exception.SonulimException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
@@ -86,12 +88,49 @@ public class Signal extends BaseEntity {
 		return new Signal(linkId, SignalSource.CUSTOM, null, null, name, description, category, icon, rhythm);
 	}
 
+	public static Signal fromTemplate(UUID linkId, UUID templateId, String name, String description,
+			SignalCategory category, String icon, List<RhythmBeat> rhythm) {
+		return new Signal(linkId, SignalSource.TEMPLATE, templateId, null, name, description, category, icon, rhythm);
+	}
+
 	public void softDelete() {
 		this.deletedAt = LocalDateTime.now(ZoneOffset.UTC);
 	}
 
 	public boolean isPracticed() {
 		return practicedAt != null;
+	}
+
+	/**
+	 * 기본 신호(SignalSource.TEMPLATE)는 이름·리듬을 바꿀 수 없다(SIGNAL_NOT_EDITABLE,
+	 * 에러 코드 설명 그대로). 설명·카테고리·아이콘은 기본 신호도 바꿀 수 있다.
+	 */
+	public void updateName(String name) {
+		requireEditable();
+		this.name = name;
+	}
+
+	public void updateRhythm(List<RhythmBeat> rhythm) {
+		requireEditable();
+		this.rhythm = List.copyOf(rhythm);
+	}
+
+	public void updateDescription(String description) {
+		this.description = description;
+	}
+
+	public void updateCategory(SignalCategory category) {
+		this.category = category;
+	}
+
+	public void updateIcon(String icon) {
+		this.icon = icon;
+	}
+
+	private void requireEditable() {
+		if (source == SignalSource.TEMPLATE) {
+			throw new SonulimException(ErrorCode.SIGNAL_NOT_EDITABLE, "기본 신호는 이름·리듬을 바꿀 수 없어요");
+		}
 	}
 
 	/**
