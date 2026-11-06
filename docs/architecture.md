@@ -58,4 +58,4 @@ com.sonulim
 
 PostgreSQL + Spring Data JPA. 스키마는 당분간 `spring.jpa.hibernate.ddl-auto: update`로 관리한다 — Flyway 마이그레이션 도입은 보류 상태이며, 전환 시점은 팀이 따로 정한다.
 
-`global.BaseEntity`(`createdAt`/`updatedAt`)는 이미 있지만, `@EnableJpaAuditing`은 아직 전역으로 켜져 있지 않다 — 지금은 `@Entity`가 하나도 없어서 켜는 순간 "JPA metamodel must not be empty"로 부팅이 실패한다. **첫 실제 도메인 `@Entity`를 만드는 사람이 `global`에 `@Configuration @EnableJpaAuditing` 클래스를 함께 추가한다.**
+`global.BaseEntity`(`createdAt`/`updatedAt`)는 `global.JpaAuditingConfig`의 `@EnableJpaAuditing`으로 자동 기록된다. `@SpringBootApplication`이 아닌 별도 설정 클래스에 둬서 `@WebMvcTest` 같은 슬라이스 테스트에는 적용되지 않는다.
