@@ -3,6 +3,7 @@ package com.sonulim.domain.signal.application;
 import java.util.List;
 import java.util.UUID;
 
+import com.sonulim.domain.signal.domain.RhythmBeat;
 import com.sonulim.domain.signal.domain.Signal;
 import com.sonulim.domain.signal.domain.SignalRepository;
 import com.sonulim.global.exception.ErrorCode;
@@ -42,5 +43,18 @@ public class SignalQueryService {
 		}
 
 		return signal;
+	}
+
+	/**
+	 * M-3 직접 만들기: 저장 전에 같은 연결 안에 동일한 리듬이 있는지 미리 알려준다. 생성 API의
+	 * 409 RHYTHM_DUPLICATE와 달리, 중복이어도 에러가 아니라 정상 응답(duplicate: true)이다 —
+	 * 저장을 막을지는 프론트가 이 값을 보고 판단한다.
+	 */
+	public RhythmCheckResult checkRhythm(UUID linkId, UUID requesterId, List<String> rhythmTokens) {
+		linkAccessGuard.verifyAccessible(linkId, requesterId);
+		List<RhythmBeat> rhythm = RhythmBeat.parseAll(rhythmTokens);
+		return signalRepository.findByLinkIdAndRhythm(linkId, rhythm, null)
+				.map(conflicting -> new RhythmCheckResult(true, conflicting.getName()))
+				.orElseGet(() -> new RhythmCheckResult(false, null));
 	}
 }
