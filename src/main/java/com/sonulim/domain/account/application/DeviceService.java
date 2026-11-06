@@ -39,4 +39,12 @@ public class DeviceService {
 						registration.pushToken(), registration.appVersion(),
 						registration.supportsVibrationIntensity())));
 	}
+
+	/**
+	 * 로그아웃한 기기는 푸시를 받지 않는다. 다른 사용자의 기기면 아무것도 하지 않는다.
+	 */
+	@Transactional
+	public void unregister(UUID userId, String installationId) {
+		deviceRepository.deleteDeviceOfUser(userId, installationId);
+	}
 }

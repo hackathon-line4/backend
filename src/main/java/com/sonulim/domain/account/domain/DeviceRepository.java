@@ -17,4 +17,8 @@ public interface DeviceRepository extends JpaRepository<Device, String> {
 	@Modifying(flushAutomatically = true, clearAutomatically = true)
 	@Query("delete from Device d where d.userId = :userId and d.installationId <> :installationId")
 	int deleteOtherDevicesOfUser(UUID userId, String installationId);
+
+	@Modifying(flushAutomatically = true, clearAutomatically = true)
+	@Query("delete from Device d where d.userId = :userId and d.installationId = :installationId")
+	int deleteDeviceOfUser(UUID userId, String installationId);
 }
