@@ -9,11 +9,15 @@
   - `notification_settings` 테이블(user_id PK). `helpRequestAlert`는 저장하지 않고 응답에 항상 `true`, 요청에 보내면 400 `FIELD_READ_ONLY`
   - PATCH는 보낸 필드만 변경. `responseWaitMinutes`는 5·10·30만 허용
   - 기본값(터치 응답 알림 켬, 응답 없음 알림 켬, 10분)은 보호자 역할 선택 때 만든다 — account가 발행하는 `RoleSelectedEvent`를 받아 같은 트랜잭션에서 생성. 저장된 값이 없으면 조회는 기본값을 돌려주고, 변경은 기본값을 저장한 뒤 바꾼다
+- 위치 공유 설정 조회 `GET /api/v1/me/location-sharing`, 변경 `PUT /api/v1/me/location-sharing` (#12) — 당사자만
+  - `location_sharing` 테이블(user_id PK, enabled, changed_at). 응답의 `updatedAt`은 사용자가 마지막으로 바꾼 시각(`changed_at`)이라 한 번도 바꾸지 않았으면 `null`
+  - 기본값(꺼짐)은 당사자 역할 선택 때 `RoleSelectedEvent`로 생성
 - 역할 확인은 `settings.application.RoleRequirement`(역할 없음 403 `ROLE_REQUIRED`, 다른 역할 403 `ROLE_MISMATCH`) — 공통화 여부는 팀에서 정하기 전까지 이 도메인 안에만 둔다
 
 ### 후속 작업
 
 - messaging(응답 없음 판정·푸시 여부)이 읽어 갈 알림 설정 조회 메서드 — 팀 회의 후 추가
+- 위치 공유: 끌 때 마지막 위치 즉시 삭제(`location`, 호출 방식 팀 회의), 보호자에게 `settings.updated` 이벤트(SSE·`link` 구현 후), location·도움 요청이 읽어 갈 공유 여부 조회 메서드(팀 회의 후)
 
 ## Pending Decisions
 
