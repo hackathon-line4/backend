@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.sonulim.domain.account.application.AuthService;
+import com.sonulim.domain.account.application.TokenService;
 import com.sonulim.global.exception.ApiResponse;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -21,9 +22,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 public class AuthController {
 
 	private final AuthService authService;
+	private final TokenService tokenService;
 
-	public AuthController(AuthService authService) {
+	public AuthController(AuthService authService, TokenService tokenService) {
 		this.authService = authService;
+		this.tokenService = tokenService;
 	}
 
 	@Operation(summary = "회원가입", description = "A-1 · 인증 없음. 가입 직후 역할은 null")
@@ -37,5 +40,12 @@ public class AuthController {
 	@PostMapping("/login")
 	public ApiResponse<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
 		return ApiResponse.success(AuthResponse.from(authService.login(request.email(), request.password())));
+	}
+
+	@Operation(summary = "토큰 갱신", description = "A-2 · 인증 없음. 쓴 갱신 토큰은 바로 무효화되고, 이미 쓴 토큰을 다시 보내면 "
+			+ "그 사용자의 갱신 토큰이 모두 무효화된다")
+	@PostMapping("/refresh")
+	public ApiResponse<TokenResponse> refresh(@Valid @RequestBody RefreshRequest request) {
+		return ApiResponse.success(TokenResponse.from(tokenService.refresh(request.refreshToken())));
 	}
 }
