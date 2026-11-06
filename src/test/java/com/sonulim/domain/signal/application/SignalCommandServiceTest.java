@@ -1,0 +1,211 @@
+package com.sonulim.domain.signal.application;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import com.sonulim.domain.signal.domain.RhythmBeat;
+import com.sonulim.domain.signal.domain.Signal;
+import com.sonulim.domain.signal.domain.SignalCategory;
+import com.sonulim.domain.signal.domain.SignalRepository;
+import com.sonulim.global.exception.ErrorCode;
+import com.sonulim.global.exception.SonulimException;
+import com.sonulim.global.linkaccess.LinkAccessGuard;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+
+@ExtendWith(MockitoExtension.class)
+class SignalCommandServiceTest {
+
+	@Mock
+	private SignalRepository signalRepository;
+
+	@Mock
+	private LinkAccessGuard linkAccessGuard;
+
+	private final UUID linkId = UUID.randomUUID();
+	private final UUID requesterId = UUID.randomUUID();
+
+	private SignalCommandService service() {
+		return new SignalCommandService(signalRepository, linkAccessGuard);
+	}
+
+	// ---- create ----
+
+	@Test
+	void createVerifiesAccessValidatesRhythmAndSaves() {
+		SignalCommandService service = service();
+		given(signalRepository.findByLinkIdAndDeletedAtIsNull(linkId)).willReturn(List.of());
+		given(signalRepository.save(any())).willAnswer(invocation -> invocation.getArgument(0));
+
+		Signal result = service.create(linkId, requesterId, "이름", "설명", SignalCategory.CHECK, "icon",
+				List.of("SHORT", "LONG"));
+
+		verify(linkAccessGuard).verifyAccessible(linkId, requesterId);
+		assertThat(result.getName()).isEqualTo("이름");
+		assertThat(result.getRhythm()).containsExactly(RhythmBeat.SHORT, RhythmBeat.LONG);
+	}
+
+	@Test
+	void createRejectsInvalidRhythmBeforeTouchingTheRepository() {
+		SignalCommandService service = service();
+
+		assertThatThrownBy(() -> service.create(linkId, requesterId, "이름", null, SignalCategory.CHECK, "icon",
+				List.of("SHORT")))
+				.isInstanceOf(SonulimException.class)
+				.extracting(e -> ((SonulimException) e).getErrorCode())
+				.isEqualTo(ErrorCode.RHYTHM_INVALID);
+		verify(signalRepository, never()).save(any());
+	}
+
+	@Test
+	void createRejectsARhythmThatDuplicatesAnExistingSignalInTheSameLink() {
+		SignalCommandService service = service();
+		Signal existing = Signal.createCustom(linkId, "기존", null, SignalCategory.CHECK, "icon",
+				List.of(RhythmBeat.SHORT, RhythmBeat.LONG));
+		given(signalRepository.findByLinkIdAndDeletedAtIsNull(linkId)).willReturn(List.of(existing));
+
+		assertThatThrownBy(() -> service.create(linkId, requesterId, "새 이름", null, SignalCategory.CHECK, "icon",
+				List.of("SHORT", "LONG")))
+				.isInstanceOf(SonulimException.class)
+				.extracting(e -> ((SonulimException) e).getErrorCode())
+				.isEqualTo(ErrorCode.RHYTHM_DUPLICATE);
+		verify(signalRepository, never()).save(any());
+	}
+
+	// ---- update ----
+
+	@Test
+	void updateLooksUpByIdVerifiesAccessOnRealLinkAndAppliesOnlyGivenFields() {
+		SignalCommandService service = service();
+		UUID signalId = UUID.randomUUID();
+		Signal signal = Signal.createCustom(linkId, "이름", "설명", SignalCategory.CHECK, "icon",
+				List.of(RhythmBeat.SHORT, RhythmBeat.LONG));
+		given(signalRepository.findByIdAndDeletedAtIsNull(signalId)).willReturn(Optional.of(signal));
+
+		Signal result = service.update(linkId, signalId, requesterId,
+				new UpdateSignalCommand("새 이름", null, null, null, null));
+
+		verify(linkAccessGuard).verifyAccessible(linkId, requesterId);
+		assertThat(result.getName()).isEqualTo("새 이름");
+		assertThat(result.getDescription()).isEqualTo("설명");
+	}
+
+	@Test
+	void updateExcludesTheSignalItselfFromTheDuplicateRhythmCheck() {
+		// Signal.createCustom()은 영속화 전엔 id가 null이라(Hibernate가 저장 시점에 채움),
+		// "실제 저장된 신호를 조회했다"는 상황을 흉내 내려고 id가 채워진 mock을 쓴다.
+		SignalCommandService service = service();
+		UUID signalId = UUID.randomUUID();
+		Signal signal = org.mockito.Mockito.mock(Signal.class);
+		given(signal.getId()).willReturn(signalId);
+		given(signal.getLinkId()).willReturn(linkId);
+		given(signalRepository.findByIdAndDeletedAtIsNull(signalId)).willReturn(Optional.of(signal));
+		given(signalRepository.findByLinkIdAndDeletedAtIsNull(linkId)).willReturn(List.of(signal));
+
+		Signal result = service.update(linkId, signalId, requesterId,
+				new UpdateSignalCommand(null, null, null, null, List.of("SHORT", "LONG")));
+
+		assertThat(result).isSameAs(signal);
+		verify(signal).updateRhythm(List.of(RhythmBeat.SHORT, RhythmBeat.LONG));
+	}
+
+	@Test
+	void updateRejectsARhythmThatDuplicatesAnotherSignalInTheSameLink() {
+		SignalCommandService service = service();
+		UUID signalId = UUID.randomUUID();
+		Signal target = Signal.createCustom(linkId, "대상", null, SignalCategory.CHECK, "icon",
+				List.of(RhythmBeat.SHORT, RhythmBeat.SHORT));
+		Signal other = Signal.createCustom(linkId, "다른 신호", null, SignalCategory.CHECK, "icon",
+				List.of(RhythmBeat.LONG, RhythmBeat.LONG));
+		given(signalRepository.findByIdAndDeletedAtIsNull(signalId)).willReturn(Optional.of(target));
+		given(signalRepository.findByLinkIdAndDeletedAtIsNull(linkId)).willReturn(List.of(target, other));
+
+		assertThatThrownBy(() -> service.update(linkId, signalId, requesterId,
+				new UpdateSignalCommand(null, null, null, null, List.of("LONG", "LONG"))))
+				.isInstanceOf(SonulimException.class)
+				.extracting(e -> ((SonulimException) e).getErrorCode())
+				.isEqualTo(ErrorCode.RHYTHM_DUPLICATE);
+	}
+
+	@Test
+	void updateReturnsNotFoundWhenSignalDoesNotExist() {
+		SignalCommandService service = service();
+		UUID signalId = UUID.randomUUID();
+		given(signalRepository.findByIdAndDeletedAtIsNull(signalId)).willReturn(Optional.empty());
+
+		assertThatThrownBy(() -> service.update(linkId, signalId, requesterId,
+				new UpdateSignalCommand("이름", null, null, null, null)))
+				.isInstanceOf(SonulimException.class)
+				.extracting(e -> ((SonulimException) e).getErrorCode())
+				.isEqualTo(ErrorCode.NOT_FOUND);
+	}
+
+	@Test
+	void updateReturnsNotFoundWhenPathLinkIdDoesNotMatchTheSignalsRealLink() {
+		SignalCommandService service = service();
+		UUID signalId = UUID.randomUUID();
+		UUID actualLinkId = UUID.randomUUID();
+		Signal signal = Signal.createCustom(actualLinkId, "이름", null, SignalCategory.CHECK, "icon",
+				List.of(RhythmBeat.SHORT, RhythmBeat.LONG));
+		given(signalRepository.findByIdAndDeletedAtIsNull(signalId)).willReturn(Optional.of(signal));
+
+		assertThatThrownBy(() -> service.update(linkId, signalId, requesterId,
+				new UpdateSignalCommand("이름", null, null, null, null)))
+				.isInstanceOf(SonulimException.class)
+				.extracting(e -> ((SonulimException) e).getErrorCode())
+				.isEqualTo(ErrorCode.NOT_FOUND);
+	}
+
+	@Test
+	void updateRejectsNameChangeOnATemplateSignal() {
+		SignalCommandService service = service();
+		UUID signalId = UUID.randomUUID();
+		Signal signal = Signal.fromTemplate(linkId, UUID.randomUUID(), "기본 신호", null,
+				SignalCategory.CHECK, "icon", List.of(RhythmBeat.SHORT, RhythmBeat.LONG));
+		given(signalRepository.findByIdAndDeletedAtIsNull(signalId)).willReturn(Optional.of(signal));
+
+		assertThatThrownBy(() -> service.update(linkId, signalId, requesterId,
+				new UpdateSignalCommand("바꾼 이름", null, null, null, null)))
+				.isInstanceOf(SonulimException.class)
+				.extracting(e -> ((SonulimException) e).getErrorCode())
+				.isEqualTo(ErrorCode.SIGNAL_NOT_EDITABLE);
+	}
+
+	// ---- delete ----
+
+	@Test
+	void deleteSoftDeletesAfterVerifyingAccessAndPathLinkMatch() {
+		SignalCommandService service = service();
+		UUID signalId = UUID.randomUUID();
+		Signal signal = Signal.createCustom(linkId, "이름", null, SignalCategory.CHECK, "icon",
+				List.of(RhythmBeat.SHORT, RhythmBeat.LONG));
+		given(signalRepository.findByIdAndDeletedAtIsNull(signalId)).willReturn(Optional.of(signal));
+
+		service.delete(linkId, signalId, requesterId);
+
+		verify(linkAccessGuard).verifyAccessible(linkId, requesterId);
+		assertThat(signal.getDeletedAt()).isNotNull();
+	}
+
+	@Test
+	void deleteReturnsNotFoundWhenSignalDoesNotExist() {
+		SignalCommandService service = service();
+		UUID signalId = UUID.randomUUID();
+		given(signalRepository.findByIdAndDeletedAtIsNull(signalId)).willReturn(Optional.empty());
+
+		assertThatThrownBy(() -> service.delete(linkId, signalId, requesterId))
+				.isInstanceOf(SonulimException.class)
+				.extracting(e -> ((SonulimException) e).getErrorCode())
+				.isEqualTo(ErrorCode.NOT_FOUND);
+	}
+}
