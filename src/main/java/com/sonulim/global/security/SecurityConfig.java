@@ -15,9 +15,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @Configuration
 public class SecurityConfig {
 
-	// 인증 없이 접근하는 경로: 회원가입·로그인 등 인증 API, Swagger, 서블릿 오류 포워딩
+	// 인증 없이 접근하는 경로: 회원가입·로그인·토큰 갱신, Swagger, 서블릿 오류 포워딩. 로그아웃은 인증이 필요하다.
 	private static final String[] PUBLIC_PATHS = {
-			"/api/v1/auth/**",
+			"/api/v1/auth/signup",
+			"/api/v1/auth/login",
+			"/api/v1/auth/refresh",
 			"/swagger-ui/**",
 			"/swagger-ui.html",
 			"/v3/api-docs/**",
