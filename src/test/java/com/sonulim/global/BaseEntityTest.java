@@ -15,10 +15,8 @@ import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * {@code @EnableJpaAuditing}은 이 테스트 안에서만 켠다 — 실제 앱에는 아직 managed entity가
- * 하나도 없어서(BaseEntity는 @MappedSuperclass일 뿐) 전역으로 켜면 "JPA metamodel must not be
- * empty"로 부팅이 실패한다. 첫 실제 도메인 @Entity를 만들 때 그 사람이 global에 똑같은
- * {@code @EnableJpaAuditing} 설정 클래스를 추가한다(docs/conventions.md 참고).
+ * {@code @DataJpaTest}는 일반 @Configuration(global.JpaAuditingConfig)을 불러오지 않으므로
+ * 이 테스트 안에서 {@code @EnableJpaAuditing}을 따로 켠다.
  */
 @DataJpaTest
 @Import(BaseEntityTest.AuditingTestConfig.class)
