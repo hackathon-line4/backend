@@ -68,6 +68,17 @@ public class TokenService {
 		return new TokenPair(createAccessToken(user), refreshToken);
 	}
 
+	/**
+	 * 로그아웃. 다른 사용자의 토큰이거나 이미 무효화된 토큰이면 아무것도 하지 않는다 — 앱은 응답과 관계없이 로그아웃하므로
+	 * 오류를 돌려줄 이유가 없다.
+	 */
+	@Transactional
+	public void revoke(UUID userId, String rawRefreshToken) {
+		refreshTokenRepository.findByTokenHash(RefreshTokenCodec.hash(rawRefreshToken))
+				.filter(token -> token.getUserId().equals(userId))
+				.ifPresent(token -> token.revoke(LocalDateTime.now(clock)));
+	}
+
 	private String createAccessToken(User user) {
 		String role = user.getRole() == null ? null : user.getRole().name();
 		return jwtTokenProvider.createAccessToken(user.getId(), role);
