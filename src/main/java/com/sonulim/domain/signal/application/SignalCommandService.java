@@ -85,10 +85,7 @@ public class SignalCommandService {
 	 * 수정 시 자기 자신을 중복 검사에서 빼기 위한 것(생성 시에는 null).
 	 */
 	private void ensureRhythmNotDuplicated(UUID linkId, List<RhythmBeat> rhythm, UUID excludeSignalId) {
-		boolean duplicate = signalRepository.findByLinkIdAndDeletedAtIsNull(linkId).stream()
-				.filter(other -> excludeSignalId == null || !other.getId().equals(excludeSignalId))
-				.anyMatch(other -> other.getRhythm().equals(rhythm));
-		if (duplicate) {
+		if (signalRepository.findByLinkIdAndRhythm(linkId, rhythm, excludeSignalId).isPresent()) {
 			throw new SonulimException(ErrorCode.RHYTHM_DUPLICATE, "같은 리듬의 신호가 이미 있어요");
 		}
 	}
