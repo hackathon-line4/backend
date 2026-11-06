@@ -1,7 +1,11 @@
 package com.sonulim.domain.account.api;
 
+import jakarta.validation.Valid;
+
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -30,5 +34,13 @@ public class MeController {
 	@GetMapping
 	public ApiResponse<MeResponse> getMe(@AuthenticationPrincipal AuthenticatedUser user) {
 		return ApiResponse.success(MeResponse.from(meService.getMe(user.userId())));
+	}
+
+	@Operation(summary = "역할 선택", description = "A-3 · 공통(역할 없어도 호출 가능). 같은 역할 재요청은 200, 다른 역할은 "
+			+ "409 ROLE_ALREADY_SET. 역할이 담긴 새 액세스·갱신 토큰을 함께 반환")
+	@PutMapping("/role")
+	public ApiResponse<RoleSelectionResponse> selectRole(@AuthenticationPrincipal AuthenticatedUser user,
+			@Valid @RequestBody RoleRequest request) {
+		return ApiResponse.success(RoleSelectionResponse.from(meService.selectRole(user.userId(), request.toRole())));
 	}
 }
