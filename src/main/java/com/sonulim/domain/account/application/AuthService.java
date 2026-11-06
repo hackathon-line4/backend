@@ -30,17 +30,20 @@ public class AuthService {
 	private final PasswordEncoder passwordEncoder;
 	private final JwtTokenProvider jwtTokenProvider;
 	private final JwtProperties jwtProperties;
+	private final LoginAttemptLimiter loginAttemptLimiter;
 	private final Clock clock;
 
 	public AuthService(UserRepository userRepository, UserAgreementRepository userAgreementRepository,
 			RefreshTokenRepository refreshTokenRepository, PasswordEncoder passwordEncoder,
-			JwtTokenProvider jwtTokenProvider, JwtProperties jwtProperties, Clock clock) {
+			JwtTokenProvider jwtTokenProvider, JwtProperties jwtProperties, LoginAttemptLimiter loginAttemptLimiter,
+			Clock clock) {
 		this.userRepository = userRepository;
 		this.userAgreementRepository = userAgreementRepository;
 		this.refreshTokenRepository = refreshTokenRepository;
 		this.passwordEncoder = passwordEncoder;
 		this.jwtTokenProvider = jwtTokenProvider;
 		this.jwtProperties = jwtProperties;
+		this.loginAttemptLimiter = loginAttemptLimiter;
 		this.clock = clock;
 	}
 
@@ -67,6 +70,26 @@ public class AuthService {
 		userAgreementRepository.saveAll(List.of(
 				UserAgreement.agree(user.getId(), AgreementType.TERMS, now),
 				UserAgreement.agree(user.getId(), AgreementType.PRIVACY, now)));
+		return issueTokens(user);
+	}
+
+	/**
+	 * 없는 이메일과 틀린 비밀번호를 같은 오류로 응답한다 — 계정 존재 여부를 드러내지 않기 위해서다.
+	 */
+	@Transactional
+	public AuthResult login(String rawEmail, String password) {
+		String email = User.normalizeEmail(rawEmail);
+		loginAttemptLimiter.checkNotLocked(email);
+
+		User user = userRepository.findByEmail(email)
+				.filter(candidate -> passwordEncoder.matches(password, candidate.getPasswordHash()))
+				.orElse(null);
+		if (user == null) {
+			loginAttemptLimiter.recordFailure(email);
+			throw new SonulimException(ErrorCode.INVALID_CREDENTIALS, "이메일 또는 비밀번호가 맞지 않아요");
+		}
+
+		loginAttemptLimiter.recordSuccess(email);
 		return issueTokens(user);
 	}
 

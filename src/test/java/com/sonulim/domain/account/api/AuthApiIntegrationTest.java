@@ -2,6 +2,7 @@ package com.sonulim.domain.account.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.empty;
+import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -92,6 +93,42 @@ class AuthApiIntegrationTest {
 				.andExpect(jsonPath("$.error.field").value("password"));
 	}
 
+	@Test
+	void loginSucceedsWithEmailInAnyCase() throws Exception {
+		signup("login@example.com", PASSWORD, true, true).andExpect(status().isCreated());
+
+		login("LOGIN@Example.com", PASSWORD)
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.accessToken").isNotEmpty())
+				.andExpect(jsonPath("$.data.refreshToken").isNotEmpty())
+				.andExpect(jsonPath("$.data.user.email").value("login@example.com"));
+	}
+
+	@Test
+	void wrongPasswordAndUnknownEmailReturnSame401() throws Exception {
+		signup("wrongpw@example.com", PASSWORD, true, true).andExpect(status().isCreated());
+
+		login("wrongpw@example.com", "wrong1234")
+				.andExpect(status().isUnauthorized())
+				.andExpect(jsonPath("$.error.code").value("INVALID_CREDENTIALS"));
+		login("nobody@example.com", PASSWORD)
+				.andExpect(status().isUnauthorized())
+				.andExpect(jsonPath("$.error.code").value("INVALID_CREDENTIALS"));
+	}
+
+	@Test
+	void loginIsLockedAfterFiveFailures() throws Exception {
+		signup("locked@example.com", PASSWORD, true, true).andExpect(status().isCreated());
+		for (int i = 0; i < 5; i++) {
+			login("locked@example.com", "wrong1234").andExpect(status().isUnauthorized());
+		}
+
+		login("locked@example.com", PASSWORD)
+				.andExpect(status().isTooManyRequests())
+				.andExpect(jsonPath("$.error.code").value("TOO_MANY_ATTEMPTS"))
+				.andExpect(jsonPath("$.error.details.retryAfterSec", greaterThan(0)));
+	}
+
 	private ResultActions signup(String email, String password, boolean terms, boolean privacy) throws Exception {
 		Map<String, Object> body = Map.of(
 				"email", email,
@@ -101,5 +138,11 @@ class AuthApiIntegrationTest {
 		return mockMvc.perform(post("/api/v1/auth/signup")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content(objectMapper.writeValueAsString(body)));
+	}
+
+	private ResultActions login(String email, String password) throws Exception {
+		return mockMvc.perform(post("/api/v1/auth/login")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(objectMapper.writeValueAsString(Map.of("email", email, "password", password))));
 	}
 }
