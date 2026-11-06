@@ -44,6 +44,37 @@ class LocationSharingApiIntegrationTest {
 	}
 
 	@Test
+	void putChangesValueAndRecordsUpdatedAt() throws Exception {
+		String accessToken = recipient("loc-put@example.com");
+
+		putSharing(accessToken, Map.of("enabled", true))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.enabled").value(true))
+				.andExpect(jsonPath("$.data.updatedAt").isNotEmpty());
+
+		getSharing(accessToken)
+				.andExpect(jsonPath("$.data.enabled").value(true))
+				.andExpect(jsonPath("$.data.updatedAt").isNotEmpty());
+	}
+
+	@Test
+	void putWithoutEnabledReturns400() throws Exception {
+		putSharing(recipient("loc-missing@example.com"), Map.of())
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.error.field").value("enabled"));
+	}
+
+	@Test
+	void putByGuardianReturns403() throws Exception {
+		String accessToken = selectRole(signup("loc-put-guardian@example.com"), "GUARDIAN");
+
+		putSharing(accessToken, Map.of("enabled", true))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.error.code").value("ROLE_MISMATCH"));
+	}
+
+	@Test
 	void guardianGets403RoleMismatch() throws Exception {
 		String accessToken = selectRole(signup("loc-guardian@example.com"), "GUARDIAN");
 
@@ -61,6 +92,13 @@ class LocationSharingApiIntegrationTest {
 
 	private ResultActions getSharing(String accessToken) throws Exception {
 		return mockMvc.perform(get(PATH).header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken));
+	}
+
+	private ResultActions putSharing(String accessToken, Map<String, Object> body) throws Exception {
+		return mockMvc.perform(put(PATH)
+				.header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(objectMapper.writeValueAsString(body)));
 	}
 
 	private String recipient(String email) throws Exception {

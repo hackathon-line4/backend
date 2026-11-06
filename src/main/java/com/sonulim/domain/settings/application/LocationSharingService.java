@@ -1,6 +1,10 @@
 package com.sonulim.domain.settings.application;
 
+import java.time.Clock;
+import java.time.LocalDateTime;
+
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.sonulim.domain.account.domain.Role;
 import com.sonulim.domain.settings.domain.LocationSharing;
@@ -11,9 +15,11 @@ import com.sonulim.global.security.AuthenticatedUser;
 public class LocationSharingService {
 
 	private final LocationSharingRepository locationSharingRepository;
+	private final Clock clock;
 
-	public LocationSharingService(LocationSharingRepository locationSharingRepository) {
+	public LocationSharingService(LocationSharingRepository locationSharingRepository, Clock clock) {
 		this.locationSharingRepository = locationSharingRepository;
+		this.clock = clock;
 	}
 
 	/**
@@ -23,5 +29,18 @@ public class LocationSharingService {
 		RoleRequirement.require(user, Role.RECIPIENT);
 		return locationSharingRepository.findById(user.userId())
 				.orElseGet(() -> LocationSharing.defaults(user.userId()));
+	}
+
+	/**
+	 * 끌 때 마지막 위치 삭제(location)와 보호자에게 settings.updated 이벤트(SSE·link)는
+	 * 해당 기능이 구현된 뒤 붙인다(docs/domains/settings.md 후속 작업).
+	 */
+	@Transactional
+	public LocationSharing update(AuthenticatedUser user, boolean enabled) {
+		RoleRequirement.require(user, Role.RECIPIENT);
+		LocationSharing locationSharing = locationSharingRepository.findById(user.userId())
+				.orElseGet(() -> locationSharingRepository.save(LocationSharing.defaults(user.userId())));
+		locationSharing.change(enabled, LocalDateTime.now(clock));
+		return locationSharing;
 	}
 }

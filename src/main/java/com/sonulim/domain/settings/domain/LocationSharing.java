@@ -41,6 +41,14 @@ public class LocationSharing extends BaseEntity {
 		return new LocationSharing(userId, false);
 	}
 
+	/**
+	 * 바꾼 시각을 남긴다(API 명세). 같은 값을 다시 보내도 시각은 갱신된다.
+	 */
+	public void change(boolean enabled, LocalDateTime now) {
+		this.enabled = enabled;
+		this.changedAt = now;
+	}
+
 	public UUID getUserId() {
 		return userId;
 	}
