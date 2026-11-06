@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
@@ -18,6 +19,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+// 예외 → 응답 변환만 검증한다. @WebMvcTest는 SecurityConfig 대신 기본 보안을 켜므로 필터를 끈다(인증은 AuthApiIntegrationTest에서 검증).
+@AutoConfigureMockMvc(addFilters = false)
 @WebMvcTest(controllers = GlobalExceptionHandlerTest.TestController.class)
 @Import({ GlobalExceptionHandler.class, GlobalExceptionHandlerTest.TestController.class })
 class GlobalExceptionHandlerTest {
