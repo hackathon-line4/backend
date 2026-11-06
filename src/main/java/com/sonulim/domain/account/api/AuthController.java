@@ -53,12 +53,11 @@ public class AuthController {
 		return ApiResponse.success(TokenResponse.from(tokenService.refresh(request.refreshToken())));
 	}
 
-	@Operation(summary = "로그아웃", description = "A-4 · 공통. 갱신 토큰을 무효화하고 이 기기의 푸시 등록을 지운다. "
-			+ "액세스 토큰은 만료까지 유효")
+	@Operation(summary = "로그아웃", description = "A-4 · 공통. 갱신 토큰을 무효화한다. 액세스 토큰은 만료까지 유효")
 	@SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
 	@PostMapping("/logout")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	public void logout(@AuthenticationPrincipal AuthenticatedUser user, @Valid @RequestBody LogoutRequest request) {
-		authService.logout(user.userId(), request.refreshToken(), request.installationId());
+		tokenService.revoke(user.userId(), request.refreshToken());
 	}
 }
