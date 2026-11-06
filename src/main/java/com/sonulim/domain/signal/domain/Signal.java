@@ -11,12 +11,15 @@ import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 /**
  * link 도메인이 아직 없어서 Link 엔티티를 참조하지 않고 linkId만 평범한 컬럼으로 가진다(FK 없음).
  * 통합 시점에 참조 무결성·연결 삭제 시 처리 방식을 link 도메인과 함께 정한다.
+ * ID는 account 도메인과 같은 관례(UUID, Hibernate 생성)를 따른다.
  */
 @Entity
 @Table(name = "signals")
@@ -25,20 +28,21 @@ public class Signal extends BaseEntity {
 	private static final long GAP_MS = 300;
 
 	@Id
-	private String id;
+	@GeneratedValue(strategy = GenerationType.UUID)
+	private UUID id;
 
 	@Column(name = "link_id", nullable = false)
-	private String linkId;
+	private UUID linkId;
 
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false)
 	private SignalSource source;
 
 	@Column(name = "template_id")
-	private String templateId;
+	private UUID templateId;
 
 	@Column(name = "preset_id")
-	private String presetId;
+	private UUID presetId;
 
 	@Column(nullable = false, length = 12)
 	private String name;
@@ -64,9 +68,8 @@ public class Signal extends BaseEntity {
 	protected Signal() {
 	}
 
-	private Signal(String linkId, SignalSource source, String templateId, String presetId, String name,
+	private Signal(UUID linkId, SignalSource source, UUID templateId, UUID presetId, String name,
 			String description, SignalCategory category, String icon, List<RhythmBeat> rhythm) {
-		this.id = UUID.randomUUID().toString();
 		this.linkId = linkId;
 		this.source = source;
 		this.templateId = templateId;
@@ -78,7 +81,7 @@ public class Signal extends BaseEntity {
 		this.rhythm = List.copyOf(rhythm);
 	}
 
-	public static Signal createCustom(String linkId, String name, String description, SignalCategory category,
+	public static Signal createCustom(UUID linkId, String name, String description, SignalCategory category,
 			String icon, List<RhythmBeat> rhythm) {
 		return new Signal(linkId, SignalSource.CUSTOM, null, null, name, description, category, icon, rhythm);
 	}
@@ -101,11 +104,11 @@ public class Signal extends BaseEntity {
 		return beatsTotal + gaps;
 	}
 
-	public String getId() {
+	public UUID getId() {
 		return id;
 	}
 
-	public String getLinkId() {
+	public UUID getLinkId() {
 		return linkId;
 	}
 
@@ -113,11 +116,11 @@ public class Signal extends BaseEntity {
 		return source;
 	}
 
-	public String getTemplateId() {
+	public UUID getTemplateId() {
 		return templateId;
 	}
 
-	public String getPresetId() {
+	public UUID getPresetId() {
 		return presetId;
 	}
 

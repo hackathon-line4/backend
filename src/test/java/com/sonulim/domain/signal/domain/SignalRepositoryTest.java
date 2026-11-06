@@ -1,6 +1,7 @@
 package com.sonulim.domain.signal.domain;
 
 import java.util.List;
+import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,6 +13,10 @@ import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * {@code @DataJpaTest}는 일반 @Configuration(global.JpaAuditingConfig)을 불러오지 않으므로
+ * 이 테스트 안에서 {@code @EnableJpaAuditing}을 따로 켠다(BaseEntityTest와 동일한 패턴).
+ */
 @DataJpaTest
 @Import(SignalRepositoryTest.AuditingTestConfig.class)
 class SignalRepositoryTest {
@@ -29,7 +34,8 @@ class SignalRepositoryTest {
 
 	@Test
 	void roundTripsRhythmAndFieldsAndStampsAuditTimes() {
-		Signal signal = Signal.createCustom("link-1", "약 먹을 시간", "저녁 약을 먹자는 뜻",
+		UUID linkId = UUID.randomUUID();
+		Signal signal = Signal.createCustom(linkId, "약 먹을 시간", "저녁 약을 먹자는 뜻",
 				SignalCategory.DAILY, "pill", List.of(RhythmBeat.SHORT, RhythmBeat.SHORT, RhythmBeat.LONG));
 
 		Signal saved = entityManager.persistFlushFind(signal);
@@ -37,7 +43,7 @@ class SignalRepositoryTest {
 		Signal reloaded = repository.findById(saved.getId()).orElseThrow();
 
 		assertThat(reloaded.getRhythm()).containsExactly(RhythmBeat.SHORT, RhythmBeat.SHORT, RhythmBeat.LONG);
-		assertThat(reloaded.getLinkId()).isEqualTo("link-1");
+		assertThat(reloaded.getLinkId()).isEqualTo(linkId);
 		assertThat(reloaded.getName()).isEqualTo("약 먹을 시간");
 		assertThat(reloaded.getSource()).isEqualTo(SignalSource.CUSTOM);
 		assertThat(reloaded.getCategory()).isEqualTo(SignalCategory.DAILY);
@@ -48,26 +54,28 @@ class SignalRepositoryTest {
 
 	@Test
 	void findsOnlyNonDeletedSignalsForALink() {
+		UUID linkId = UUID.randomUUID();
 		Signal active = entityManager.persistAndFlush(
-				Signal.createCustom("link-2", "활성 신호", null, SignalCategory.CHECK, "icon",
+				Signal.createCustom(linkId, "활성 신호", null, SignalCategory.CHECK, "icon",
 						List.of(RhythmBeat.SHORT, RhythmBeat.LONG)));
-		Signal deleted = Signal.createCustom("link-2", "삭제된 신호", null, SignalCategory.CHECK, "icon",
+		Signal deleted = Signal.createCustom(linkId, "삭제된 신호", null, SignalCategory.CHECK, "icon",
 				List.of(RhythmBeat.LONG, RhythmBeat.LONG));
 		deleted.softDelete();
 		entityManager.persistAndFlush(deleted);
 
-		List<Signal> result = repository.findByLinkIdAndDeletedAtIsNull("link-2");
+		List<Signal> result = repository.findByLinkIdAndDeletedAtIsNull(linkId);
 
 		assertThat(result).extracting(Signal::getId).containsExactly(active.getId());
 	}
 
 	@Test
 	void findsNothingForADifferentLink() {
+		UUID linkId = UUID.randomUUID();
 		entityManager.persistAndFlush(
-				Signal.createCustom("link-3", "다른 연결 신호", null, SignalCategory.OUTING, "icon",
+				Signal.createCustom(linkId, "다른 연결 신호", null, SignalCategory.OUTING, "icon",
 						List.of(RhythmBeat.SHORT, RhythmBeat.SHORT)));
 
-		List<Signal> result = repository.findByLinkIdAndDeletedAtIsNull("link-99");
+		List<Signal> result = repository.findByLinkIdAndDeletedAtIsNull(UUID.randomUUID());
 
 		assertThat(result).isEmpty();
 	}
