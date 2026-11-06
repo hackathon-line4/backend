@@ -7,15 +7,20 @@ import com.sonulim.domain.signal.domain.RhythmBeat;
 import com.sonulim.domain.signal.domain.Signal;
 import com.sonulim.domain.signal.domain.SignalCategory;
 import com.sonulim.domain.signal.domain.SignalRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sonulim.global.security.JwtTokenProvider;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -31,6 +36,8 @@ class SignalControllerTest {
 
 	@Autowired
 	private SignalRepository signalRepository;
+
+	private final ObjectMapper objectMapper = new ObjectMapper();
 
 	private String bearerTokenFor(UUID userId) {
 		return "Bearer " + jwtTokenProvider.createAccessToken(userId, "GUARDIAN");
@@ -102,5 +109,133 @@ class SignalControllerTest {
 	void requiresAuthentication() throws Exception {
 		mockMvc.perform(get("/api/v1/links/{linkId}/signals", UUID.randomUUID()))
 				.andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void fullLifecycleCreateReadUpdateReadDeleteRead() throws Exception {
+		UUID linkId = UUID.randomUUID();
+		String token = bearerTokenFor(UUID.randomUUID());
+		String createBody = objectMapper.writeValueAsString(
+				new CreateSignalRequest("약 먹을 시간", "저녁 약", SignalCategory.DAILY, "pill",
+						List.of("SHORT", "SHORT", "LONG")));
+
+		// 1) 생성
+		String createResponse = mockMvc.perform(post("/api/v1/links/{linkId}/signals", linkId)
+						.header(HttpHeaders.AUTHORIZATION, token)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(createBody))
+				.andExpect(status().isCreated())
+				.andExpect(jsonPath("$.data.name").value("약 먹을 시간"))
+				.andReturn().getResponse().getContentAsString();
+		UUID signalId = UUID.fromString(objectMapper.readTree(createResponse).at("/data/id").asText());
+
+		// 2) 조회 — 생성한 값 그대로
+		mockMvc.perform(get("/api/v1/links/{linkId}/signals/{signalId}", linkId, signalId)
+						.header(HttpHeaders.AUTHORIZATION, token))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.name").value("약 먹을 시간"))
+				.andExpect(jsonPath("$.data.rhythm[2]").value("LONG"));
+
+		// 3) 수정 — 이름과 리듬만 변경
+		String updateBody = objectMapper.writeValueAsString(
+				new UpdateSignalRequest("약 먹을 시간(수정)", null, null, null, List.of("LONG", "LONG")));
+		mockMvc.perform(patch("/api/v1/links/{linkId}/signals/{signalId}", linkId, signalId)
+						.header(HttpHeaders.AUTHORIZATION, token)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(updateBody))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.name").value("약 먹을 시간(수정)"))
+				.andExpect(jsonPath("$.data.rhythm[0]").value("LONG"))
+				.andExpect(jsonPath("$.data.description").value("저녁 약"));
+
+		// 4) 조회 — 수정된 값 반영
+		mockMvc.perform(get("/api/v1/links/{linkId}/signals/{signalId}", linkId, signalId)
+						.header(HttpHeaders.AUTHORIZATION, token))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.name").value("약 먹을 시간(수정)"));
+
+		// 5) 삭제
+		mockMvc.perform(delete("/api/v1/links/{linkId}/signals/{signalId}", linkId, signalId)
+						.header(HttpHeaders.AUTHORIZATION, token))
+				.andExpect(status().isNoContent());
+
+		// 6) 조회 — 삭제 후 404, 목록에서도 제외
+		mockMvc.perform(get("/api/v1/links/{linkId}/signals/{signalId}", linkId, signalId)
+						.header(HttpHeaders.AUTHORIZATION, token))
+				.andExpect(status().isNotFound());
+		mockMvc.perform(get("/api/v1/links/{linkId}/signals", linkId)
+						.header(HttpHeaders.AUTHORIZATION, token))
+				.andExpect(jsonPath("$.data").isEmpty());
+	}
+
+	@Test
+	void createRejectsAnInvalidRhythm() throws Exception {
+		UUID linkId = UUID.randomUUID();
+		String body = objectMapper.writeValueAsString(
+				new CreateSignalRequest("이름", null, SignalCategory.CHECK, "icon", List.of("SHORT")));
+
+		mockMvc.perform(post("/api/v1/links/{linkId}/signals", linkId)
+						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID()))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(body))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error.code").value("RHYTHM_INVALID"));
+	}
+
+	@Test
+	void createRejectsADuplicateRhythmInTheSameLink() throws Exception {
+		UUID linkId = UUID.randomUUID();
+		signalRepository.saveAndFlush(Signal.createCustom(linkId, "기존", null, SignalCategory.CHECK, "icon",
+				List.of(RhythmBeat.SHORT, RhythmBeat.LONG)));
+		String body = objectMapper.writeValueAsString(
+				new CreateSignalRequest("새 신호", null, SignalCategory.CHECK, "icon", List.of("SHORT", "LONG")));
+
+		mockMvc.perform(post("/api/v1/links/{linkId}/signals", linkId)
+						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID()))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(body))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.error.code").value("RHYTHM_DUPLICATE"));
+	}
+
+	@Test
+	void createRejectsABlankName() throws Exception {
+		UUID linkId = UUID.randomUUID();
+		String body = objectMapper.writeValueAsString(
+				new CreateSignalRequest("", null, SignalCategory.CHECK, "icon", List.of("SHORT", "LONG")));
+
+		mockMvc.perform(post("/api/v1/links/{linkId}/signals", linkId)
+						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID()))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(body))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+	}
+
+	@Test
+	void updateRejectsNameOrRhythmChangeOnATemplateSignal() throws Exception {
+		UUID linkId = UUID.randomUUID();
+		Signal templateSignal = signalRepository.saveAndFlush(Signal.fromTemplate(linkId, UUID.randomUUID(),
+				"기본 신호", null, SignalCategory.CHECK, "icon", List.of(RhythmBeat.SHORT, RhythmBeat.LONG)));
+		String body = objectMapper.writeValueAsString(
+				new UpdateSignalRequest("바꾼 이름", null, null, null, null));
+
+		mockMvc.perform(patch("/api/v1/links/{linkId}/signals/{signalId}", linkId, templateSignal.getId())
+						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID()))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(body))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error.code").value("SIGNAL_NOT_EDITABLE"));
+	}
+
+	@Test
+	void deleteReturns404ForASignalFromADifferentLink() throws Exception {
+		UUID actualLinkId = UUID.randomUUID();
+		Signal signal = signalRepository.saveAndFlush(Signal.createCustom(actualLinkId, "신호", null,
+				SignalCategory.CHECK, "icon", List.of(RhythmBeat.SHORT, RhythmBeat.LONG)));
+
+		mockMvc.perform(delete("/api/v1/links/{linkId}/signals/{signalId}", UUID.randomUUID(), signal.getId())
+						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID())))
+				.andExpect(status().isNotFound());
 	}
 }
