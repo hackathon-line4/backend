@@ -50,6 +50,15 @@ public class VibrationSettings extends BaseEntity {
 		return new VibrationSettings(userId, VibrationIntensity.NORMAL, VibrationLength.NORMAL, 2);
 	}
 
+	/**
+	 * 통째로 바꾼다(PUT). 반복 범위(1~5) 검사는 요청 단계에서 한다.
+	 */
+	public void change(VibrationIntensity intensity, VibrationLength length, int repeatCount) {
+		this.intensity = intensity;
+		this.length = length;
+		this.repeatCount = repeatCount;
+	}
+
 	public UUID getUserId() {
 		return userId;
 	}

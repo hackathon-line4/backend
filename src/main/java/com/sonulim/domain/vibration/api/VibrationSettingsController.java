@@ -1,7 +1,11 @@
 package com.sonulim.domain.vibration.api;
 
+import jakarta.validation.Valid;
+
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -30,5 +34,14 @@ public class VibrationSettingsController {
 	@GetMapping
 	public ApiResponse<VibrationSettingsResponse> get(@AuthenticationPrincipal AuthenticatedUser user) {
 		return ApiResponse.success(VibrationSettingsResponse.from(vibrationSettingsService.get(user.userId())));
+	}
+
+	@Operation(summary = "내 진동 설정 저장", description = "C-1 · 공통. 통째로 바꾼다. intensity null은 세기 조절 미지원, "
+			+ "repeatCount 1~5")
+	@PutMapping
+	public ApiResponse<VibrationSettingsResponse> save(@AuthenticationPrincipal AuthenticatedUser user,
+			@Valid @RequestBody VibrationSettingsRequest request) {
+		return ApiResponse.success(
+				VibrationSettingsResponse.from(vibrationSettingsService.save(user.userId(), request.toChange())));
 	}
 }
