@@ -79,4 +79,41 @@ class SignalRepositoryTest {
 
 		assertThat(result).isEmpty();
 	}
+
+	@Test
+	void findsTheSignalWithAMatchingRhythmInTheSameLink() {
+		UUID linkId = UUID.randomUUID();
+		Signal signal = entityManager.persistAndFlush(
+				Signal.createCustom(linkId, "가자", null, SignalCategory.OUTING, "icon",
+						List.of(RhythmBeat.SHORT, RhythmBeat.LONG)));
+
+		var found = repository.findByLinkIdAndRhythm(linkId, List.of(RhythmBeat.SHORT, RhythmBeat.LONG), null);
+
+		assertThat(found).contains(signal);
+	}
+
+	@Test
+	void excludesTheGivenIdFromTheRhythmMatch() {
+		UUID linkId = UUID.randomUUID();
+		Signal signal = entityManager.persistAndFlush(
+				Signal.createCustom(linkId, "가자", null, SignalCategory.OUTING, "icon",
+						List.of(RhythmBeat.SHORT, RhythmBeat.LONG)));
+
+		var found = repository.findByLinkIdAndRhythm(linkId, List.of(RhythmBeat.SHORT, RhythmBeat.LONG),
+				signal.getId());
+
+		assertThat(found).isEmpty();
+	}
+
+	@Test
+	void findsNothingWhenNoRhythmMatches() {
+		UUID linkId = UUID.randomUUID();
+		entityManager.persistAndFlush(
+				Signal.createCustom(linkId, "가자", null, SignalCategory.OUTING, "icon",
+						List.of(RhythmBeat.SHORT, RhythmBeat.LONG)));
+
+		var found = repository.findByLinkIdAndRhythm(linkId, List.of(RhythmBeat.LONG, RhythmBeat.LONG), null);
+
+		assertThat(found).isEmpty();
+	}
 }

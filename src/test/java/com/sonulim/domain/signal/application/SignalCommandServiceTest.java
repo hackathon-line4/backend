@@ -44,7 +44,6 @@ class SignalCommandServiceTest {
 	@Test
 	void createVerifiesAccessValidatesRhythmAndSaves() {
 		SignalCommandService service = service();
-		given(signalRepository.findByLinkIdAndDeletedAtIsNull(linkId)).willReturn(List.of());
 		given(signalRepository.save(any())).willAnswer(invocation -> invocation.getArgument(0));
 
 		Signal result = service.create(linkId, requesterId, "이름", "설명", SignalCategory.CHECK, "icon",
@@ -72,7 +71,8 @@ class SignalCommandServiceTest {
 		SignalCommandService service = service();
 		Signal existing = Signal.createCustom(linkId, "기존", null, SignalCategory.CHECK, "icon",
 				List.of(RhythmBeat.SHORT, RhythmBeat.LONG));
-		given(signalRepository.findByLinkIdAndDeletedAtIsNull(linkId)).willReturn(List.of(existing));
+		given(signalRepository.findByLinkIdAndRhythm(linkId, List.of(RhythmBeat.SHORT, RhythmBeat.LONG), null))
+				.willReturn(Optional.of(existing));
 
 		assertThatThrownBy(() -> service.create(linkId, requesterId, "새 이름", null, SignalCategory.CHECK, "icon",
 				List.of("SHORT", "LONG")))
@@ -110,7 +110,6 @@ class SignalCommandServiceTest {
 		given(signal.getId()).willReturn(signalId);
 		given(signal.getLinkId()).willReturn(linkId);
 		given(signalRepository.findByIdAndDeletedAtIsNull(signalId)).willReturn(Optional.of(signal));
-		given(signalRepository.findByLinkIdAndDeletedAtIsNull(linkId)).willReturn(List.of(signal));
 
 		Signal result = service.update(linkId, signalId, requesterId,
 				new UpdateSignalCommand(null, null, null, null, List.of("SHORT", "LONG")));
@@ -128,7 +127,8 @@ class SignalCommandServiceTest {
 		Signal other = Signal.createCustom(linkId, "다른 신호", null, SignalCategory.CHECK, "icon",
 				List.of(RhythmBeat.LONG, RhythmBeat.LONG));
 		given(signalRepository.findByIdAndDeletedAtIsNull(signalId)).willReturn(Optional.of(target));
-		given(signalRepository.findByLinkIdAndDeletedAtIsNull(linkId)).willReturn(List.of(target, other));
+		given(signalRepository.findByLinkIdAndRhythm(linkId, List.of(RhythmBeat.LONG, RhythmBeat.LONG), null))
+				.willReturn(Optional.of(other));
 
 		assertThatThrownBy(() -> service.update(linkId, signalId, requesterId,
 				new UpdateSignalCommand(null, null, null, null, List.of("LONG", "LONG"))))
