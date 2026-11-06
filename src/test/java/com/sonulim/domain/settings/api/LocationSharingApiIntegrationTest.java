@@ -1,5 +1,6 @@
 package com.sonulim.domain.settings.api;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -8,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.util.Map;
+import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,6 +23,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jayway.jsonpath.JsonPath;
+import com.sonulim.domain.settings.domain.LocationSharing;
+import com.sonulim.domain.settings.domain.LocationSharingRepository;
+import com.sonulim.global.security.JwtTokenProvider;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -35,12 +40,38 @@ class LocationSharingApiIntegrationTest {
 	@Autowired
 	private ObjectMapper objectMapper;
 
+	@Autowired
+	private LocationSharingRepository locationSharingRepository;
+
+	@Autowired
+	private JwtTokenProvider jwtTokenProvider;
+
+	private UUID userIdOf(String accessToken) {
+		return jwtTokenProvider.parse(accessToken).userId();
+	}
+
 	@Test
 	void recipientGetsDefaultOffWithoutUpdatedAt() throws Exception {
 		getSharing(recipient("loc-default@example.com"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data.enabled").value(false))
 				.andExpect(jsonPath("$.data.updatedAt").value(nullValue()));
+	}
+
+	@Test
+	void selectingRecipientRoleCreatesDefaultOff() throws Exception {
+		String accessToken = recipient("loc-created@example.com");
+
+		LocationSharing locationSharing = locationSharingRepository.findById(userIdOf(accessToken)).orElseThrow();
+		assertThat(locationSharing.isEnabled()).isFalse();
+		assertThat(locationSharing.getChangedAt()).isNull();
+	}
+
+	@Test
+	void selectingGuardianRoleDoesNotCreateLocationSharing() throws Exception {
+		String accessToken = selectRole(signup("loc-not-created@example.com"), "GUARDIAN");
+
+		assertThat(locationSharingRepository.findById(userIdOf(accessToken))).isEmpty();
 	}
 
 	@Test

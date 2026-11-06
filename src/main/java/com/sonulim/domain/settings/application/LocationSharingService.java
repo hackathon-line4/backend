@@ -3,9 +3,11 @@ package com.sonulim.domain.settings.application;
 import java.time.Clock;
 import java.time.LocalDateTime;
 
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.sonulim.domain.account.application.RoleSelectedEvent;
 import com.sonulim.domain.account.domain.Role;
 import com.sonulim.domain.settings.domain.LocationSharing;
 import com.sonulim.domain.settings.domain.LocationSharingRepository;
@@ -29,6 +31,16 @@ public class LocationSharingService {
 		RoleRequirement.require(user, Role.RECIPIENT);
 		return locationSharingRepository.findById(user.userId())
 				.orElseGet(() -> LocationSharing.defaults(user.userId()));
+	}
+
+	/**
+	 * 당사자 역할을 고르면 기본값(꺼짐)을 만든다. selectRole과 같은 트랜잭션에서 실행된다.
+	 */
+	@EventListener
+	public void createDefaultsForRecipient(RoleSelectedEvent event) {
+		if (event.role() == Role.RECIPIENT && !locationSharingRepository.existsById(event.userId())) {
+			locationSharingRepository.save(LocationSharing.defaults(event.userId()));
+		}
 	}
 
 	/**
