@@ -12,10 +12,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.sonulim.domain.account.application.AuthService;
 import com.sonulim.domain.account.application.TokenService;
+import com.sonulim.global.OpenApiConfig;
 import com.sonulim.global.exception.ApiResponse;
 import com.sonulim.global.security.AuthenticatedUser;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 @Tag(name = "인증·계정")
@@ -52,6 +54,7 @@ public class AuthController {
 	}
 
 	@Operation(summary = "로그아웃", description = "A-4 · 공통. 갱신 토큰을 무효화한다. 액세스 토큰은 만료까지 유효")
+	@SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
 	@PostMapping("/logout")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	public void logout(@AuthenticationPrincipal AuthenticatedUser user, @Valid @RequestBody LogoutRequest request) {
