@@ -1,5 +1,6 @@
 package com.sonulim.domain.settings.api;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -8,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.util.Map;
+import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,6 +23,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jayway.jsonpath.JsonPath;
+import com.sonulim.domain.settings.domain.NotificationSettings;
+import com.sonulim.domain.settings.domain.NotificationSettingsRepository;
+import com.sonulim.global.security.JwtTokenProvider;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -35,6 +40,16 @@ class NotificationSettingsApiIntegrationTest {
 	@Autowired
 	private ObjectMapper objectMapper;
 
+	@Autowired
+	private NotificationSettingsRepository notificationSettingsRepository;
+
+	@Autowired
+	private JwtTokenProvider jwtTokenProvider;
+
+	private UUID userIdOf(String accessToken) {
+		return jwtTokenProvider.parse(accessToken).userId();
+	}
+
 	@Test
 	void guardianGetsDefaultSettings() throws Exception {
 		String accessToken = guardian("noti-default@example.com");
@@ -45,6 +60,23 @@ class NotificationSettingsApiIntegrationTest {
 				.andExpect(jsonPath("$.data.noResponseAlert").value(true))
 				.andExpect(jsonPath("$.data.responseWaitMinutes").value(10))
 				.andExpect(jsonPath("$.data.helpRequestAlert").value(true));
+	}
+
+	@Test
+	void selectingGuardianRoleCreatesDefaultSettings() throws Exception {
+		String accessToken = guardian("noti-created@example.com");
+
+		NotificationSettings settings = notificationSettingsRepository.findById(userIdOf(accessToken)).orElseThrow();
+		assertThat(settings.isTouchResponseAlert()).isTrue();
+		assertThat(settings.isNoResponseAlert()).isTrue();
+		assertThat(settings.getResponseWaitMinutes()).isEqualTo(10);
+	}
+
+	@Test
+	void selectingRecipientRoleDoesNotCreateNotificationSettings() throws Exception {
+		String accessToken = selectRole(signup("noti-not-created@example.com"), "RECIPIENT");
+
+		assertThat(notificationSettingsRepository.findById(userIdOf(accessToken))).isEmpty();
 	}
 
 	@Test

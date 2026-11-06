@@ -1,8 +1,10 @@
 package com.sonulim.domain.settings.application;
 
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.sonulim.domain.account.application.RoleSelectedEvent;
 import com.sonulim.domain.account.domain.Role;
 import com.sonulim.domain.settings.domain.NotificationSettings;
 import com.sonulim.domain.settings.domain.NotificationSettingsRepository;
@@ -26,6 +28,16 @@ public class NotificationSettingsService {
 		RoleRequirement.require(user, Role.GUARDIAN);
 		return notificationSettingsRepository.findById(user.userId())
 				.orElseGet(() -> NotificationSettings.defaults(user.userId()));
+	}
+
+	/**
+	 * 보호자 역할을 고르면 기본값(켬, 켬, 10분)을 만든다. selectRole과 같은 트랜잭션에서 실행된다.
+	 */
+	@EventListener
+	public void createDefaultsForGuardian(RoleSelectedEvent event) {
+		if (event.role() == Role.GUARDIAN && !notificationSettingsRepository.existsById(event.userId())) {
+			notificationSettingsRepository.save(NotificationSettings.defaults(event.userId()));
+		}
 	}
 
 	/**
