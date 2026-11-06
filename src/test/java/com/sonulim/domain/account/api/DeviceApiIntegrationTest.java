@@ -1,6 +1,7 @@
 package com.sonulim.domain.account.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -101,6 +102,30 @@ class DeviceApiIntegrationTest {
 	}
 
 	@Test
+	void getMeByRecipientUpdatesLastSeenAt() throws Exception {
+		Session user = signup("recipient@example.com");
+		String accessToken = selectRole(user.accessToken(), "RECIPIENT");
+		register(accessToken, "inst_a", deviceBody("ANDROID", "push_a")).andExpect(status().isNoContent());
+
+		mockMvc.perform(get("/api/v1/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+				.andExpect(status().isOk());
+
+		assertThat(deviceRepository.findById("inst_a").orElseThrow().getLastSeenAt()).isNotNull();
+	}
+
+	@Test
+	void getMeByGuardianDoesNotUpdateLastSeenAt() throws Exception {
+		Session user = signup("guardian-seen@example.com");
+		String accessToken = selectRole(user.accessToken(), "GUARDIAN");
+		register(accessToken, "inst_a", deviceBody("IOS", "push_a")).andExpect(status().isNoContent());
+
+		mockMvc.perform(get("/api/v1/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+				.andExpect(status().isOk());
+
+		assertThat(deviceRepository.findById("inst_a").orElseThrow().getLastSeenAt()).isNull();
+	}
+
+	@Test
 	void unknownPlatformReturns400() throws Exception {
 		Session user = signup("platform@example.com");
 
@@ -144,6 +169,16 @@ class DeviceApiIntegrationTest {
 				.header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
 				.contentType(MediaType.APPLICATION_JSON)
 				.content(objectMapper.writeValueAsString(body)));
+	}
+
+	private String selectRole(String accessToken, String role) throws Exception {
+		String response = mockMvc.perform(put("/api/v1/me/role")
+						.header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(objectMapper.writeValueAsString(Map.of("role", role))))
+				.andExpect(status().isOk())
+				.andReturn().getResponse().getContentAsString();
+		return JsonPath.read(response, "$.data.accessToken");
 	}
 
 	private static Map<String, Object> deviceBody(String platform, String pushToken) {

@@ -1,5 +1,7 @@
 package com.sonulim.domain.account.application;
 
+import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -14,9 +16,11 @@ import com.sonulim.global.exception.SonulimException;
 public class DeviceService {
 
 	private final DeviceRepository deviceRepository;
+	private final Clock clock;
 
-	public DeviceService(DeviceRepository deviceRepository) {
+	public DeviceService(DeviceRepository deviceRepository, Clock clock) {
 		this.deviceRepository = deviceRepository;
+		this.clock = clock;
 	}
 
 	/**
@@ -46,5 +50,13 @@ public class DeviceService {
 	@Transactional
 	public void unregister(UUID userId, String installationId) {
 		deviceRepository.deleteDeviceOfUser(userId, installationId);
+	}
+
+	/**
+	 * 앱을 마지막으로 연 시각. GET /me 요청에는 기기 정보가 없어서 사용자의 기기 전체(MVP는 1대)를 갱신한다.
+	 */
+	@Transactional
+	public void markSeen(UUID userId) {
+		deviceRepository.updateLastSeenAt(userId, LocalDateTime.now(clock));
 	}
 }

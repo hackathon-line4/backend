@@ -1,5 +1,6 @@
 package com.sonulim.domain.account.domain;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -21,4 +22,8 @@ public interface DeviceRepository extends JpaRepository<Device, String> {
 	@Modifying(flushAutomatically = true, clearAutomatically = true)
 	@Query("delete from Device d where d.userId = :userId and d.installationId = :installationId")
 	int deleteDeviceOfUser(UUID userId, String installationId);
+
+	@Modifying(flushAutomatically = true, clearAutomatically = true)
+	@Query("update Device d set d.lastSeenAt = :now where d.userId = :userId")
+	int updateLastSeenAt(UUID userId, LocalDateTime now);
 }
