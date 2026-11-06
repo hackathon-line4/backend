@@ -5,6 +5,11 @@ spring:
     default: local
   jpa:
     open-in-view: false
+    properties:
+      hibernate:
+        # 서버 시각은 UTC로 저장한다(공통 규칙). JVM 기본 시간대 고정(SonulimApplication)과 함께 둔다.
+        jdbc:
+          time_zone: UTC
 
 server:
   port: 8080
