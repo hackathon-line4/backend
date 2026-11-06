@@ -20,11 +20,15 @@
   - step 9개: `SENT` `FAILED` `DELIVERED` `UNCONFIRMED` `PLAYED` `RESPONDED` `NO_RESPONSE` `WAIT_EXTENDED` `EMERGENCY_WARNING`
   - `PLAYED`는 줄을 하나만 두고 `meta.count`만 갱신한다(명세: "처음 보고 때 PLAYED를 남기고 이후에는 횟수만 갱신")
 - ack 판정 시간·응답 대기 시간은 아직 확정되지 않아 상수로 박지 않고 메서드 파라미터로 받는다
+- 서버 타이머 3종 (#20): ack 판정 → `UNCONFIRMED`, 대기 만료 → `NO_RESPONSE`, 긴급 전달 후 무응답 → `emergencyWarning`
+  - 기한(`ackDeadline`·`waitUntil`)을 DB 컬럼으로 들고 있어 **서버가 재시작해도 판정이 사라지지 않는다**. 짧은 주기(`sonulim.messaging.timer-sweep-interval-ms`, 기본 5초) 스케줄러가 지난 건을 훑는다
+  - 판정과 터치 응답의 경합은 **낙관적 락(`@Version`)**으로 푼다. 벌크 UPDATE가 아니라 엔티티를 거치는 이유는 판정도 타임라인에 남아야 하기 때문이다 — 진 쪽은 `ObjectOptimisticLockingFailureException`으로 끝나고 타이머가 그 건을 건너뛴다. 늦게 도착한 터치가 판정에 덮이지 않는다
+  - 판정은 건별 트랜잭션이라 한 건이 실패해도 나머지가 함께 말리지 않는다
+  - `@Scheduled`의 `fixedDelayString`은 `5s` 같은 표기를 못 읽는다(밀리초 또는 ISO-8601만). 그래서 주기만 ms 숫자로 두고, 미확정 **업무** 값인 긴급 경고 지연은 `MessagingProperties`에 Duration으로 둔다
+- 타임라인은 `LAZY`다. 목록 조회에서 N+1이 나지 않게 유지하고, 기록 상세는 fetch join으로 가져온다 — 트랜잭션 밖에서 `getTimeline()`을 읽으면 터진다
 
 ### 후속 작업 (해당 기능 구현 시)
 
-- 서버 타이머(ack 판정 → `UNCONFIRMED`, 대기 만료 → `NO_RESPONSE`, 긴급 30초 → `emergencyWarning`). `ackDeadline`·`waitUntil`을 컬럼으로 들고 있어 서버가 재시작해도 살아남는다
-- `MessageRepository`와 조건부 UPDATE — 판정과 응답이 동시에 들어올 수 있다(서버 내부 처리 문서)
 - `canResend`: 원래 신호가 삭제되지 않았는지 — `signal` 도메인 구현 후
 - 신호 보내기·다시 보내기의 연결 구성원 검증(아니면 403이 아니라 404) — `link` 도메인 구현 후
 - 응답 대기 시간을 보호자의 `notification_settings.response_wait_minutes`에서 읽기 — `settings` 구현 후
