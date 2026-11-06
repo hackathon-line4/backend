@@ -10,3 +10,8 @@ spring:
     properties:
       hibernate:
         format_sql: true
+
+sonulim:
+  jwt:
+    # 로컬 개발 전용 기본 키(HS256 최소 32바이트). 운영은 환경 변수 JWT_SECRET으로만 주입한다.
+    secret: ${JWT_SECRET:local-dev-only-jwt-secret-do-not-use-in-prod-0123456789}
