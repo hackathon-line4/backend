@@ -69,4 +69,11 @@ public class SignalController {
 		signalCommandService.delete(linkId, signalId, user.userId());
 		return ResponseEntity.noContent().build();
 	}
+
+	@PostMapping("/rhythm-check")
+	public ApiResponse<RhythmCheckResponse> checkRhythm(@PathVariable UUID linkId,
+			@Valid @RequestBody RhythmCheckRequest request, @AuthenticationPrincipal AuthenticatedUser user) {
+		var result = signalQueryService.checkRhythm(linkId, user.userId(), request.rhythm());
+		return ApiResponse.success(RhythmCheckResponse.from(result));
+	}
 }
