@@ -1,6 +1,7 @@
 package com.sonulim.domain.settings.api;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -63,12 +64,61 @@ class NotificationSettingsApiIntegrationTest {
 	}
 
 	@Test
+	void patchChangesOnlySentFields() throws Exception {
+		String accessToken = guardian("noti-patch@example.com");
+
+		patchSettings(accessToken, Map.of("responseWaitMinutes", 30))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.responseWaitMinutes").value(30))
+				.andExpect(jsonPath("$.data.touchResponseAlert").value(true));
+		patchSettings(accessToken, Map.of("touchResponseAlert", false)).andExpect(status().isOk());
+
+		getSettings(accessToken)
+				.andExpect(jsonPath("$.data.touchResponseAlert").value(false))
+				.andExpect(jsonPath("$.data.noResponseAlert").value(true))
+				.andExpect(jsonPath("$.data.responseWaitMinutes").value(30));
+	}
+
+	@Test
+	void patchWithNotAllowedWaitMinutesReturns400() throws Exception {
+		patchSettings(guardian("noti-minutes@example.com"), Map.of("responseWaitMinutes", 15))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.error.field").value("responseWaitMinutes"));
+	}
+
+	@Test
+	void patchWithHelpRequestAlertReturns400FieldReadOnly() throws Exception {
+		patchSettings(guardian("noti-help@example.com"), Map.of("helpRequestAlert", false))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error.code").value("FIELD_READ_ONLY"))
+				.andExpect(jsonPath("$.error.message").value("도움 요청 알림은 끌 수 없어요"))
+				.andExpect(jsonPath("$.error.field").value("helpRequestAlert"));
+	}
+
+	@Test
+	void patchByRecipientReturns403() throws Exception {
+		String accessToken = selectRole(signup("noti-patch-recipient@example.com"), "RECIPIENT");
+
+		patchSettings(accessToken, Map.of("noResponseAlert", false))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.error.code").value("ROLE_MISMATCH"));
+	}
+
+	@Test
 	void withoutTokenReturns401() throws Exception {
 		mockMvc.perform(get(PATH)).andExpect(status().isUnauthorized());
 	}
 
 	private ResultActions getSettings(String accessToken) throws Exception {
 		return mockMvc.perform(get(PATH).header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken));
+	}
+
+	private ResultActions patchSettings(String accessToken, Map<String, Object> body) throws Exception {
+		return mockMvc.perform(patch(PATH)
+				.header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(objectMapper.writeValueAsString(body)));
 	}
 
 	private String guardian(String email) throws Exception {

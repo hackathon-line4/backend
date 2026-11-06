@@ -51,6 +51,21 @@ public class NotificationSettings extends BaseEntity {
 		return new NotificationSettings(userId, true, true, DEFAULT_RESPONSE_WAIT_MINUTES);
 	}
 
+	/**
+	 * 보낸 값만 바꾼다(null은 그대로 둠). 대기 시간 허용값 검사는 호출하는 쪽에서 먼저 한다.
+	 */
+	public void change(Boolean touchResponseAlert, Boolean noResponseAlert, Integer responseWaitMinutes) {
+		if (touchResponseAlert != null) {
+			this.touchResponseAlert = touchResponseAlert;
+		}
+		if (noResponseAlert != null) {
+			this.noResponseAlert = noResponseAlert;
+		}
+		if (responseWaitMinutes != null) {
+			this.responseWaitMinutes = responseWaitMinutes;
+		}
+	}
+
 	public UUID getUserId() {
 		return userId;
 	}
