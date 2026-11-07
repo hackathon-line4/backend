@@ -46,4 +46,45 @@ class LinkTest {
 
 		assertThat(link.getEndedAt()).isEqualTo(NOW.plusDays(1));
 	}
+
+	@Test
+	void connectionIsUnknownUntilChecked() {
+		assertThat(link.getConnectionState()).isEqualTo(ConnectionState.UNKNOWN);
+		assertThat(link.getLastConfirmedAt()).isNull();
+	}
+
+	// 연결 확인 컬럼이 생기기 전에 만들어진 행은 null — UNKNOWN으로 읽는다.
+	@Test
+	void missingConnectionStateReadsAsUnknown() {
+		ReflectionTestUtils.setField(link, "connectionState", null);
+
+		assertThat(link.getConnectionState()).isEqualTo(ConnectionState.UNKNOWN);
+	}
+
+	@Test
+	void confirmedConnectionRecordsLastConfirmedAt() {
+		link.connectionConfirmed(NOW.plusMinutes(1));
+
+		assertThat(link.getConnectionState()).isEqualTo(ConnectionState.CONFIRMED);
+		assertThat(link.getLastConfirmedAt()).isEqualTo(NOW.plusMinutes(1));
+	}
+
+	@Test
+	void lateAckKeepsUnconfirmedStateButUpdatesLastConfirmedAt() {
+		link.connectionUnconfirmed();
+
+		link.connectionSeenAt(NOW.plusMinutes(2));
+
+		assertThat(link.getConnectionState()).isEqualTo(ConnectionState.UNCONFIRMED);
+		assertThat(link.getLastConfirmedAt()).isEqualTo(NOW.plusMinutes(2));
+	}
+
+	@Test
+	void lastConfirmedAtNeverMovesBackwards() {
+		link.connectionConfirmed(NOW.plusMinutes(5));
+
+		link.connectionSeenAt(NOW.plusMinutes(3));
+
+		assertThat(link.getLastConfirmedAt()).isEqualTo(NOW.plusMinutes(5));
+	}
 }

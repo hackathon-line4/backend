@@ -6,6 +6,7 @@ import java.util.UUID;
 import com.sonulim.domain.account.domain.Role;
 import com.sonulim.domain.account.domain.User;
 import com.sonulim.domain.link.application.LinkRequestDetails;
+import com.sonulim.domain.link.domain.ConnectionState;
 import com.sonulim.domain.link.domain.Link;
 import com.sonulim.domain.link.domain.LinkRequest;
 import com.sonulim.domain.link.domain.LinkRequestStatus;
@@ -45,15 +46,17 @@ public record LinkRequestResponse(UUID id, LinkRequestStatus status, Party guard
 
 		static LinkResponse from(Link link, User guardian, User recipient) {
 			return new LinkResponse(link.getId(), link.getStatus(), Party.from(guardian), Party.from(recipient),
-					link.getLinkedAt(), Connection.UNKNOWN);
+					link.getLinkedAt(), Connection.from(link));
 		}
 	}
 
 	/**
-	 * 연결 상태 확인(T-2) 결과. 연결 확인 기능이 아직 없어서 항상 UNKNOWN이다.
+	 * 연결 확인(T-2) 결과. 확인한 적 없으면 UNKNOWN.
 	 */
-	public record Connection(String state, LocalDateTime lastConfirmedAt) {
+	public record Connection(ConnectionState state, LocalDateTime lastConfirmedAt) {
 
-		static final Connection UNKNOWN = new Connection("UNKNOWN", null);
+		static Connection from(Link link) {
+			return new Connection(link.getConnectionState(), link.getLastConfirmedAt());
+		}
 	}
 }
