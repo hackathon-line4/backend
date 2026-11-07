@@ -19,7 +19,7 @@
   - 승인·거절·취소는 요청 행을 비관적 락으로 읽어, 동시에 와도 하나만 상태를 바꾼다.
   - 조회는 요청의 보호자·당사자만, 승인·거절은 그 요청의 보호자만, 취소는 그 요청의 당사자만. 남의 요청과 형식이 틀린 id는 없는 요청과 같은 404 `NOT_FOUND`.
   - 목록: 내가 보호자인 요청만 최신순. `status`가 있으면 그 상태 전체, 없으면 최근 24시간 전체. 잘못된 `status`는 400 `VALIDATION_FAILED`(`field=status`).
-  - `Link`(`links`): `ACTIVE` → `ENDED`(#41). 응답의 `connection`은 연결 상태 확인(T-2) 전이라 항상 `{state: "UNKNOWN", lastConfirmedAt: null}`.
+  - `Link`(`links`): `ACTIVE` → `ENDED`(#41). 응답의 `connection`은 연결 확인(T-2, #43) 결과 — 확인한 적 없으면 `{state: "UNKNOWN", lastConfirmedAt: null}`.
   - MVP 1:1 — `Link.activeGuardianId`·`activeRecipientId`는 살아 있는 연결에만 값이 있는 nullable 유니크 컬럼이라 DB가 한 사람당 살아 있는 연결 하나만 허용한다. 승인이 동시에 와서 제약에 걸리면 `ALREADY_LINKED`. 연결 해제(L-4)에서 두 컬럼을 비운다.
   - `ALREADY_LINKED`(409): 연결된 보호자는 코드 만들기(L-1) 불가. 코드 확인·요청 보내기는 코드의 보호자나 당사자가 이미 연결돼 있으면(코드가 맞을 때만, 틀린 시도로 세지 않음), 승인은 그사이 다른 연결이 생겼으면.
 - **연결 해제 (#41)** — `DELETE /api/v1/links/{linkId}`(L-4) 구현. 요청·응답·오류는 Notion API 명세 기준.
@@ -33,6 +33,14 @@
     ALTER TABLE links DROP CONSTRAINT links_status_check;
     ALTER TABLE links ADD CONSTRAINT links_status_check CHECK (status IN ('ACTIVE', 'ENDED'));
     ```
+- **연결 확인 (#43)** — 요청 `POST /api/v1/links/{linkId}/connection-checks`(202), ack `POST /api/v1/connection-checks/{checkId}/ack`(204), 결과 조회 `GET /api/v1/connection-checks/{checkId}`(T-2, 예외로 이 도메인에 포함). 요청·응답·오류는 Notion API 명세 기준.
+  - `ConnectionCheck`(`connection_checks`): `PENDING` → `CONFIRMED`/`UNCONFIRMED`. `timeoutAt` = 요청 시각 + 30초(명세 "제안" 값, `ConnectionCheck.TIMEOUT` 상수 하나 — Pending Decisions "연결 확인 타임아웃").
+  - 타임아웃은 서버 타이머 없이 요청·ack·조회 시점에 판정한다. 지났는데 `PENDING`이면 `UNCONFIRMED`로 바꾸고 연결도 `UNCONFIRMED`.
+  - 요청: 연결의 보호자·당사자(역할 검사 없음). 같은 연결에 아직 끝나지 않은 `PENDING` 확인이 있으면 누가 요청했든 그것을 돌려준다(명세).
+  - ack: 요청한 사람이 아닌 쪽만. 처음 한 번만 기록. 타임아웃 안이면 `CONFIRMED`·`confirmedAt`, 연결은 `CONFIRMED`·`lastConfirmedAt`. 타임아웃 뒤의 첫 ack는 연결의 `lastConfirmedAt`만 갱신(명세, 나머지는 Pending Decisions "명세 해석"). 항상 204.
+  - `Link.connectionState`(`CONFIRMED`/`UNCONFIRMED`/`UNKNOWN`, Notion "공통 데이터 형식" 확정 값)·`lastConfirmedAt` 추가. 이 컬럼보다 먼저 만들어진 연결 행이 있는 DB에서도 `ddl-auto: update`가 실패하지 않도록 nullable이고, null은 `UNKNOWN`으로 읽는다. `lastConfirmedAt`은 뒤로 가지 않는다.
+  - 404 `NOT_FOUND`: 연결의 구성원이 아니거나, 해제된 연결(Pending Decisions)이거나, 없는·형식이 틀린 id.
+  - 잠그는 순서는 항상 연결 → 확인(비관적 락). 요청이 동시에 와도 한 연결에 `PENDING`은 하나, ack가 동시에 와도 처음 한 번만 기록.
 
 ### 후속 작업 (해당 기능 구현 시)
 
@@ -47,6 +55,9 @@
   - 당사자에게 `link.updated` 이벤트(SSE 허브 #39 머지 후).
   - 이 연결로 오는 전송을 `LINK_ENDED`로 막기, 진행 중인 `WAITING` 신호 타이머 멈추기 — messaging 도메인(조한결)과 조율.
   - `global.linkaccess.LinkAccessGuard`의 실제 구현(연결 존재·구성원 확인, 해제된 연결 차단) — 인터페이스가 signal PR #9·#13에 있어서 하은별님 PR과 조율. 그 PR 설명상 실제 구현이 없으면 prod 프로파일 기동이 실패한다.
+- 연결 확인 (#43에서 뺀 것):
+  - 상대 기기에 조용한 푸시(`CONNECTION_CHECK`) + `connection_check.requested` 이벤트, ack 뒤 요청한 쪽에 `connection_check.updated` 이벤트(SSE 허브 #39·기기 등록 #17 머지 후).
+  - 타임아웃 서버 타이머 — 지금은 아무도 그 확인을 다시 조회하거나 ack하지 않으면 연결의 `connection.state`가 `UNCONFIRMED`로 늦게 바뀐다(앱은 SSE가 없으면 2초마다 조회하므로 실제로는 바로 반영된다). 스케줄러(`global.SchedulingConfig`, messaging PR #21)가 생기면 만료 요청과 함께 붙인다.
 
 ## Pending Decisions
 
@@ -55,6 +66,10 @@
 - **연결 해제 뒤 기록**: 기록은 남기되 조회 불가, 보관 기간 뒤 삭제(기획 확정 필요) — `history` 도메인과 보관 정책 공유. #41은 기록을 건드리지 않는다.
 - **이미 해제된 연결 다시 해제**: 명세에 없는 경우. 재시도해도 결과(해제됨)가 같으므로 다시 204로 응답한다(팀 결정, #41). — 프론트 확인 필요.
 - **사용된 코드 재사용 금지**: 명세에 없는 보수적 결정(팀 결정, #41). 승인에 쓴 코드는 만료 전이어도 코드 확인·요청 보내기에서 `LINK_CODE_NOT_FOUND`. 1:1에서는 `ALREADY_LINKED`로 막혔지만 연결 해제 뒤에는 막을 것이 없어서 넣었다. — 기획 확인 필요.
+- **해제된 연결의 연결 확인**: 명세의 연결 확인 3개 API에 해제된 연결 이야기가 없다(오류 목록은 401·404·500뿐). 요청·ack·조회 모두 404 `NOT_FOUND`로 처리한다(팀 결정, #43 — 명세의 오류 목록 안에서만 처리). L-4의 "이후 이 연결로 오는 전송은 `LINK_ENDED`"가 연결 확인도 포함하는지 — 기획 확인 필요.
+- **연결 확인 명세 해석 (#43)**: 아래는 명세 문장을 이렇게 해석해 구현했다(팀 확인). — 프론트 확인 필요.
+  - "요청한 사람이 아닌 쪽만" ack — 요청한 사람 본인의 ack는 404 `NOT_FOUND`(명세 오류 목록에 404만 있음).
+  - 타임아웃 뒤에 온 ack — 확인 결과는 `UNCONFIRMED`·`confirmedAt: null` 그대로, 연결 상태도 `UNCONFIRMED` 그대로 두고 `lastConfirmedAt`만 갱신(명세에 "lastConfirmedAt은 갱신"만 있음).
 - **해제 뒤 현재 코드 조회**: 승인에 쓴 코드가 아직 만료 전이면 `GET /link-codes/current`가 그 코드를 돌려주지만, 그 코드는 위 결정으로 쓸 수 없다. 보호자는 새 코드를 만들면 된다. 현재 코드 조회에서도 빼야 할지 — 프론트 확인 필요.
 - **연결 인원 제약 (보호자 : 당사자)**: 자료끼리 맞지 않는다. Notion API 명세(L-1·L-2 "MVP 1:1이므로 `ALREADY_LINKED`")와 이 문서의 이전 기록("1:1(MVP), 경로는 `/links/{linkId}/…`로 둬서 추후 확장 — 이미 확정")은 1:1, Figma 메모는 보호자 한 명이 당사자 여러 명과 연결 가능. #37은 1:1(MVP)로 구현했다. 1:N으로 바뀌면 `Link.activeGuardianId` 유니크 컬럼과 보호자 쪽 `ALREADY_LINKED` 검사(코드 만들기·코드 확인·요청 보내기·승인)를 뺀다 — Figma 메모의 1:N은 팀 확인 필요.
 - **연결 요청 10분 경과 처리**: Figma 메모는 "요청 후 10분 동안 응답이 없으면 자동 취소", Notion API 명세는 "지나면 `EXPIRED`". 앱 분기(`REJECTED`·`EXPIRED` → 실패 안내)가 Notion 명세에 있어서 `EXPIRED`로 구현했다(`CANCELED`는 당사자가 취소했거나 새 요청에 밀려난 경우만). — 기획 확인 필요.
