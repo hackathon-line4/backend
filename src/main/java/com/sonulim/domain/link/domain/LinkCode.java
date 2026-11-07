@@ -57,6 +57,9 @@ public class LinkCode extends BaseEntity {
 	// 같은 보호자가 새 코드를 만들면 기록한다.
 	private LocalDateTime revokedAt;
 
+	// 이 코드로 온 연결 요청이 승인된 시각. 거절된 요청은 코드를 쓰지 않는다(만료 전이면 다시 쓸 수 있음).
+	private LocalDateTime usedAt;
+
 	protected LinkCode() {
 	}
 
@@ -78,6 +81,12 @@ public class LinkCode extends BaseEntity {
 
 	public boolean isRevoked() {
 		return revokedAt != null;
+	}
+
+	public void markUsed(LocalDateTime now) {
+		if (usedAt == null) {
+			this.usedAt = now;
+		}
 	}
 
 	public boolean isLive(LocalDateTime now) {
@@ -110,5 +119,9 @@ public class LinkCode extends BaseEntity {
 
 	public LocalDateTime getRevokedAt() {
 		return revokedAt;
+	}
+
+	public LocalDateTime getUsedAt() {
+		return usedAt;
 	}
 }

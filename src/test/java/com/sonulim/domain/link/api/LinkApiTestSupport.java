@@ -1,5 +1,6 @@
 package com.sonulim.domain.link.api;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -71,6 +72,58 @@ final class LinkApiTestSupport {
 				.andExpect(status().isCreated())
 				.andReturn().getResponse().getContentAsString();
 		return JsonPath.read(body, "$.data.code");
+	}
+
+	// 시간을 액세스 토큰 유효 시간(1시간) 넘게 앞당긴 테스트에서 새 토큰을 받을 때 쓴다.
+	String login(String email) throws Exception {
+		String body = mockMvc.perform(post("/api/v1/auth/login")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(objectMapper.writeValueAsString(Map.of("email", email, "password", "abcd1234"))))
+				.andExpect(status().isOk())
+				.andReturn().getResponse().getContentAsString();
+		return JsonPath.read(body, "$.data.accessToken");
+	}
+
+	String userId(String accessToken) throws Exception {
+		String body = mockMvc.perform(get("/api/v1/me").header(HttpHeaders.AUTHORIZATION, bearer(accessToken)))
+				.andExpect(status().isOk())
+				.andReturn().getResponse().getContentAsString();
+		return JsonPath.read(body, "$.data.user.id");
+	}
+
+	ResultActions sendRequest(String accessToken, String code) throws Exception {
+		return sendRequest(accessToken, code, UUID.randomUUID().toString());
+	}
+
+	ResultActions sendRequest(String accessToken, String code, String idempotencyKey) throws Exception {
+		var request = post("/api/v1/link-requests")
+				.header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(objectMapper.writeValueAsString(Map.of("code", code)));
+		if (idempotencyKey != null) {
+			request.header("Idempotency-Key", idempotencyKey);
+		}
+		return mockMvc.perform(request);
+	}
+
+	String sentRequestId(String accessToken, String code) throws Exception {
+		String body = sendRequest(accessToken, code)
+				.andExpect(status().isCreated())
+				.andReturn().getResponse().getContentAsString();
+		return JsonPath.read(body, "$.data.id");
+	}
+
+	ResultActions getRequest(String accessToken, String requestId) throws Exception {
+		return mockMvc.perform(get("/api/v1/link-requests/" + requestId)
+				.header(HttpHeaders.AUTHORIZATION, bearer(accessToken)));
+	}
+
+	/**
+	 * action은 cancel·approve·reject.
+	 */
+	ResultActions decide(String accessToken, String requestId, String action) throws Exception {
+		return mockMvc.perform(post("/api/v1/link-requests/" + requestId + "/" + action)
+				.header(HttpHeaders.AUTHORIZATION, bearer(accessToken)));
 	}
 
 	static String bearer(String accessToken) {

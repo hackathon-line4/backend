@@ -10,7 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.sonulim.domain.account.domain.Role;
 import com.sonulim.domain.account.domain.User;
-import com.sonulim.domain.account.domain.UserRepository;
+import com.sonulim.domain.link.application.LinkCodeChecker.CheckedLinkCode;
 import com.sonulim.domain.link.domain.LinkCode;
 import com.sonulim.domain.link.domain.LinkCodeRepository;
 import com.sonulim.global.exception.ErrorCode;
@@ -25,32 +25,34 @@ public class LinkCodeService {
 
 	private final LinkCodeRepository linkCodeRepository;
 	private final LinkCodeGenerator linkCodeGenerator;
-	private final LinkCodeAttemptLimiter attemptLimiter;
-	private final UserRepository userRepository;
+	private final LinkCodeChecker linkCodeChecker;
+	private final ActiveLinkChecker activeLinkChecker;
 	private final Clock clock;
 
 	public LinkCodeService(LinkCodeRepository linkCodeRepository, LinkCodeGenerator linkCodeGenerator,
-			LinkCodeAttemptLimiter attemptLimiter, UserRepository userRepository, Clock clock) {
+			LinkCodeChecker linkCodeChecker, ActiveLinkChecker activeLinkChecker, Clock clock) {
 		this.linkCodeRepository = linkCodeRepository;
 		this.linkCodeGenerator = linkCodeGenerator;
-		this.attemptLimiter = attemptLimiter;
-		this.userRepository = userRepository;
+		this.linkCodeChecker = linkCodeChecker;
+		this.activeLinkChecker = activeLinkChecker;
 		this.clock = clock;
 	}
 
 	/**
 	 * 새 코드를 만들고 이 보호자의 이전 코드를 바로 무효화한다. 같은 Idempotency-Key로 다시 오면 그때 만든 코드를 그대로 돌려준다.
+	 * 이미 연결된 보호자는 만들 수 없다(MVP 1:1, ALREADY_LINKED).
 	 */
 	@Transactional
 	public LinkCode create(AuthenticatedUser user, String idempotencyKeyHeader) {
 		RoleRequirement.require(user, Role.GUARDIAN);
-		UUID idempotencyKey = parseIdempotencyKey(idempotencyKeyHeader);
+		UUID idempotencyKey = IdempotencyKeys.parse(idempotencyKeyHeader);
 
 		Optional<LinkCode> alreadyCreated =
 				linkCodeRepository.findByGuardianIdAndIdempotencyKey(user.userId(), idempotencyKey);
 		if (alreadyCreated.isPresent()) {
 			return alreadyCreated.get();
 		}
+		activeLinkChecker.requireGuardianNotLinked(user.userId());
 
 		LocalDateTime now = LocalDateTime.now(clock);
 		linkCodeRepository.revokeLiveByGuardianId(user.userId(), now);
@@ -65,28 +67,14 @@ public class LinkCodeService {
 
 	/**
 	 * 당사자가 입력한 코드를 확인하고 코드를 만든 보호자를 돌려준다. 연결 요청은 만들지 않는다.
-	 * 없는 코드·무효화된 코드는 LINK_CODE_NOT_FOUND, 만료된 코드는 LINK_CODE_EXPIRED이고, 둘 다 틀린 시도로 센다.
+	 * 코드가 맞아도 보호자나 당사자가 이미 연결돼 있으면 ALREADY_LINKED(틀린 시도로 세지 않는다).
 	 */
 	public LinkCodeVerification verify(AuthenticatedUser user, String code) {
 		RoleRequirement.require(user, Role.RECIPIENT);
-		attemptLimiter.checkNotBlocked(user.userId());
-
-		LocalDateTime now = LocalDateTime.now(clock);
-		LinkCode linkCode = linkCodeRepository.findLatestNotRevokedByCode(code)
-				.orElseThrow(() -> failedAttempt(user, ErrorCode.LINK_CODE_NOT_FOUND, "코드를 다시 확인해 주세요"));
-		if (linkCode.isExpired(now)) {
-			throw failedAttempt(user, ErrorCode.LINK_CODE_EXPIRED, "코드가 만료됐어요. 보호자에게 새 코드를 받아 주세요");
-		}
-
-		// 코드를 만든 보호자가 없으면(탈퇴 등) 쓸 수 없는 코드로 본다.
-		User guardian = userRepository.findById(linkCode.getGuardianId())
-				.orElseThrow(() -> failedAttempt(user, ErrorCode.LINK_CODE_NOT_FOUND, "코드를 다시 확인해 주세요"));
-		return new LinkCodeVerification(guardian.getId(), guardian.getName(), linkCode.getExpiresAt());
-	}
-
-	private SonulimException failedAttempt(AuthenticatedUser user, ErrorCode errorCode, String message) {
-		attemptLimiter.recordFailure(user.userId());
-		return SonulimException.forField(errorCode, message, "code");
+		CheckedLinkCode checked = linkCodeChecker.check(user.userId(), code);
+		User guardian = checked.guardian();
+		activeLinkChecker.requireNotLinked(guardian.getId(), user.userId());
+		return new LinkCodeVerification(guardian.getId(), guardian.getName(), checked.linkCode().getExpiresAt());
 	}
 
 	private String nextUnusedCode(LocalDateTime now) {
@@ -97,17 +85,5 @@ public class LinkCodeService {
 			}
 		}
 		throw new SonulimException(ErrorCode.INTERNAL_ERROR, "잠시 후 다시 시도해 주세요");
-	}
-
-	private static UUID parseIdempotencyKey(String header) {
-		if (header == null || header.isBlank()) {
-			throw new SonulimException(ErrorCode.IDEMPOTENCY_KEY_REQUIRED, "Idempotency-Key 헤더가 필요해요");
-		}
-		try {
-			return UUID.fromString(header.trim());
-		} catch (IllegalArgumentException exception) {
-			throw SonulimException.forField(ErrorCode.VALIDATION_FAILED, "Idempotency-Key는 UUID 형식이어야 해요",
-					"Idempotency-Key");
-		}
 	}
 }
