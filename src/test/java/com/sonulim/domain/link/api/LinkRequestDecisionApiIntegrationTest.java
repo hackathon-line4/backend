@@ -282,8 +282,10 @@ class LinkRequestDecisionApiIntegrationTest {
 	@Test
 	void codeOfLinkedGuardianReturnsAlreadyLinkedOnVerifyAndRequest() throws Exception {
 		String guardian = support.signupAs("lrd-lg-g@example.com", "이영희", "GUARDIAN");
+		String requestId = support.sentRequestId(support.signupAs("lrd-lg-r1@example.com", "김하늘", "RECIPIENT"),
+				support.createdCode(guardian));
+		// 승인 전에 만든 새 코드 — 사용되지 않은 코드라 코드 검사는 통과하고 보호자 연결 여부에서 막힌다.
 		String code = support.createdCode(guardian);
-		String requestId = support.sentRequestId(support.signupAs("lrd-lg-r1@example.com", "김하늘", "RECIPIENT"), code);
 		support.decide(guardian, requestId, "approve").andExpect(status().isOk());
 		String another = support.signupAs("lrd-lg-r2@example.com", "최민지", "RECIPIENT");
 

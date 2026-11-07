@@ -83,6 +83,10 @@ public class LinkCode extends BaseEntity {
 		return revokedAt != null;
 	}
 
+	public boolean isUsed() {
+		return usedAt != null;
+	}
+
 	public void markUsed(LocalDateTime now) {
 		if (usedAt == null) {
 			this.usedAt = now;
