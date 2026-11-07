@@ -15,6 +15,7 @@
 - enum은 DB에 문자열로 저장한다(`@Enumerated(EnumType.STRING)`). ordinal 저장 금지.
 - 시간은 UTC로 저장하고 응답은 `+09:00`로 변환한다(`공통 규칙` 문서 기준). 초 단위까지 유지한다. `BaseEntity`의 `LocalDateTime` 필드는 `global.JacksonConfig`가 응답 직렬화 시 자동으로 `+09:00`·초 단위로 바꿔준다 — 도메인 코드에서 따로 변환하지 않는다. JVM 기본 시간대는 `SonulimApplication`에서 UTC로 고정되어 있으므로 `LocalDateTime.now()`는 실행 환경과 관계없이 UTC다 — `ZoneId`를 따로 지정하거나 KST로 바꿔 저장하지 않는다(로컬 로그 시각도 UTC로 찍힌다).
 - 예외를 무분별하게 `RuntimeException`으로 던지지 않는다. 비즈니스 예외는 `com.sonulim.global.exception.SonulimException`에 `ErrorCode`를 명시해서 던진다 — `GlobalExceptionHandler`가 공통 규칙 문서의 응답 형식(`ApiResponse`)으로 변환한다. `ErrorCode`는 Notion 에러 코드 목록(33개) 그대로다. 새 에러가 필요하면 Notion에도 먼저 추가하고 `ErrorCode`에 반영한다.
+- 잘못된 입력은 전부 `400 VALIDATION_FAILED`로 나간다. 본문 파싱 실패(깨진 JSON·본문 없음·enum/날짜 타입 불일치)와 경로 변수 타입 불일치는 `GlobalExceptionHandler`가 잡는다 — 따로 막지 않으면 500으로 샌다. **DTO에서 enum을 문자열로 받아 `@Pattern`으로 검사하던 우회는 이제 필요 없다**(enum 타입 그대로 받으면 된다).
 - 한 PR에 관련 없는 변경을 섞지 않는다.
 
 ## 패키지 규칙
