@@ -51,14 +51,29 @@ public class JwtTokenProvider {
 	}
 
 	public AuthenticatedUser parse(String token) {
+		Claims claims = verifiedClaims(token);
 		try {
-			Claims claims = Jwts.parser()
+			return new AuthenticatedUser(UUID.fromString(claims.getSubject()), claims.get(ROLE_CLAIM, String.class));
+		} catch (IllegalArgumentException exception) {
+			throw new SonulimException(ErrorCode.UNAUTHORIZED, "다시 로그인해 주세요");
+		}
+	}
+
+	/**
+	 * 액세스 토큰의 만료 시각. SSE 연결을 토큰 만료 시각에 닫는 데 쓴다(Notion API 명세 `GET /api/v1/events`).
+	 */
+	public Instant expiresAt(String token) {
+		return verifiedClaims(token).getExpiration().toInstant();
+	}
+
+	private Claims verifiedClaims(String token) {
+		try {
+			return Jwts.parser()
 					.verifyWith(key)
 					.clock(() -> Date.from(clock.instant()))
 					.build()
 					.parseSignedClaims(token)
 					.getPayload();
-			return new AuthenticatedUser(UUID.fromString(claims.getSubject()), claims.get(ROLE_CLAIM, String.class));
 		} catch (ExpiredJwtException exception) {
 			throw new SonulimException(ErrorCode.TOKEN_EXPIRED, "토큰이 만료되었습니다");
 		} catch (JwtException | IllegalArgumentException exception) {
