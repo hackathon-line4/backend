@@ -10,7 +10,7 @@ import jakarta.validation.constraints.Size;
  * PATCH 부분 수정 — 보낸 필드만 바뀐다(null은 그대로 둔다는 뜻).
  */
 public record UpdateSignalRequest(
-		@Size(max = 12) String name,
+		@Size(min = 1, max = 12) String name,
 		String description,
 		SignalCategory category,
 		String icon,

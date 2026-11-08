@@ -77,6 +77,40 @@ class SignalControllerTest {
 	}
 
 	@Test
+	void listOrdersByCategoryThenCreationOrderAcrossCategories() throws Exception {
+		UUID linkId = UUID.randomUUID();
+		signalRepository.saveAndFlush(Signal.createCustom(linkId, "긴급", null, SignalCategory.EMERGENCY, "icon",
+				List.of(RhythmBeat.LONG, RhythmBeat.LONG)));
+		signalRepository.saveAndFlush(Signal.createCustom(linkId, "외출", null, SignalCategory.OUTING, "icon",
+				List.of(RhythmBeat.SHORT, RhythmBeat.LONG)));
+		signalRepository.saveAndFlush(Signal.createCustom(linkId, "일상", null, SignalCategory.DAILY, "icon",
+				List.of(RhythmBeat.SHORT, RhythmBeat.SHORT)));
+
+		mockMvc.perform(get("/api/v1/links/{linkId}/signals", linkId)
+						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID())))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.items[0].name").value("일상"))
+				.andExpect(jsonPath("$.data.items[1].name").value("외출"))
+				.andExpect(jsonPath("$.data.items[2].name").value("긴급"));
+	}
+
+	@Test
+	void listFiltersByTheCategoryQueryParameter() throws Exception {
+		UUID linkId = UUID.randomUUID();
+		signalRepository.saveAndFlush(Signal.createCustom(linkId, "일상", null, SignalCategory.DAILY, "icon",
+				List.of(RhythmBeat.SHORT, RhythmBeat.SHORT)));
+		signalRepository.saveAndFlush(Signal.createCustom(linkId, "외출", null, SignalCategory.OUTING, "icon",
+				List.of(RhythmBeat.SHORT, RhythmBeat.LONG)));
+
+		mockMvc.perform(get("/api/v1/links/{linkId}/signals", linkId)
+						.queryParam("category", "OUTING")
+						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID())))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.items.length()").value(1))
+				.andExpect(jsonPath("$.data.items[0].name").value("외출"));
+	}
+
+	@Test
 	void listRejectsARequesterWhoIsNotAGuardianWith403() throws Exception {
 		mockMvc.perform(get("/api/v1/links/{linkId}/signals", UUID.randomUUID())
 						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID(), "RECIPIENT")))
@@ -95,6 +129,23 @@ class SignalControllerTest {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data.id").value(signal.getId().toString()))
 				.andExpect(jsonPath("$.data.name").value("신호"));
+	}
+
+	@Test
+	void detailReturns400InsteadOf500WhenSignalIdIsNotAValidUuid() throws Exception {
+		mockMvc.perform(get("/api/v1/links/{linkId}/signals/{signalId}", UUID.randomUUID(), "not-a-uuid")
+						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID())))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
+	}
+
+	@Test
+	void listReturns400InsteadOf500ForAnUnknownCategoryQueryValue() throws Exception {
+		mockMvc.perform(get("/api/v1/links/{linkId}/signals", UUID.randomUUID())
+						.queryParam("category", "NOT_A_CATEGORY")
+						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID())))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
 	}
 
 	@Test
@@ -142,6 +193,7 @@ class SignalControllerTest {
 		// 1) 생성
 		String createResponse = mockMvc.perform(post("/api/v1/links/{linkId}/signals", linkId)
 						.header(HttpHeaders.AUTHORIZATION, token)
+						.header("Idempotency-Key", UUID.randomUUID().toString())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(createBody))
 				.andExpect(status().isCreated())
@@ -196,26 +248,32 @@ class SignalControllerTest {
 
 		mockMvc.perform(post("/api/v1/links/{linkId}/signals", linkId)
 						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID()))
+						.header("Idempotency-Key", UUID.randomUUID().toString())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(body))
 				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.error.code").value("RHYTHM_INVALID"));
+				.andExpect(jsonPath("$.error.code").value("RHYTHM_INVALID"))
+				.andExpect(jsonPath("$.error.field").value("rhythm"));
 	}
 
 	@Test
 	void createRejectsADuplicateRhythmInTheSameLink() throws Exception {
 		UUID linkId = UUID.randomUUID();
-		signalRepository.saveAndFlush(Signal.createCustom(linkId, "기존", null, SignalCategory.CHECK, "icon",
-				List.of(RhythmBeat.SHORT, RhythmBeat.LONG)));
+		Signal existing = signalRepository.saveAndFlush(Signal.createCustom(linkId, "기존", null, SignalCategory.CHECK,
+				"icon", List.of(RhythmBeat.SHORT, RhythmBeat.LONG)));
 		String body = objectMapper.writeValueAsString(
 				new CreateSignalRequest("새 신호", null, SignalCategory.CHECK, "icon", List.of("SHORT", "LONG")));
 
 		mockMvc.perform(post("/api/v1/links/{linkId}/signals", linkId)
 						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID()))
+						.header("Idempotency-Key", UUID.randomUUID().toString())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(body))
 				.andExpect(status().isConflict())
-				.andExpect(jsonPath("$.error.code").value("RHYTHM_DUPLICATE"));
+				.andExpect(jsonPath("$.error.code").value("RHYTHM_DUPLICATE"))
+				.andExpect(jsonPath("$.error.field").value("rhythm"))
+				.andExpect(jsonPath("$.error.details.conflictSignal.id").value(existing.getId().toString()))
+				.andExpect(jsonPath("$.error.details.conflictSignal.name").value("기존"));
 	}
 
 	@Test
@@ -226,6 +284,7 @@ class SignalControllerTest {
 
 		mockMvc.perform(post("/api/v1/links/{linkId}/signals", linkId)
 						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID()))
+						.header("Idempotency-Key", UUID.randomUUID().toString())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(body))
 				.andExpect(status().isBadRequest())
@@ -240,10 +299,70 @@ class SignalControllerTest {
 
 		mockMvc.perform(post("/api/v1/links/{linkId}/signals", linkId)
 						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID(), "RECIPIENT"))
+						.header("Idempotency-Key", UUID.randomUUID().toString())
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(body))
 				.andExpect(status().isForbidden())
 				.andExpect(jsonPath("$.error.code").value("ROLE_MISMATCH"));
+	}
+
+	@Test
+	void createRequiresTheIdempotencyKeyHeader() throws Exception {
+		UUID linkId = UUID.randomUUID();
+		String body = objectMapper.writeValueAsString(
+				new CreateSignalRequest("이름", null, SignalCategory.CHECK, "icon", List.of("SHORT", "LONG")));
+
+		mockMvc.perform(post("/api/v1/links/{linkId}/signals", linkId)
+						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID()))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(body))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error.code").value("IDEMPOTENCY_KEY_REQUIRED"));
+	}
+
+	@Test
+	void createRetriedWithTheSameIdempotencyKeyReturnsTheSameSignalWithoutCreatingAnother() throws Exception {
+		UUID linkId = UUID.randomUUID();
+		String token = bearerTokenFor(UUID.randomUUID());
+		String idempotencyKey = UUID.randomUUID().toString();
+		String body = objectMapper.writeValueAsString(
+				new CreateSignalRequest("이름", null, SignalCategory.CHECK, "icon", List.of("SHORT", "LONG")));
+
+		String firstResponse = mockMvc.perform(post("/api/v1/links/{linkId}/signals", linkId)
+						.header(HttpHeaders.AUTHORIZATION, token)
+						.header("Idempotency-Key", idempotencyKey)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(body))
+				.andExpect(status().isCreated())
+				.andReturn().getResponse().getContentAsString();
+		UUID firstSignalId = UUID.fromString(objectMapper.readTree(firstResponse).at("/data/id").asText());
+
+		mockMvc.perform(post("/api/v1/links/{linkId}/signals", linkId)
+						.header(HttpHeaders.AUTHORIZATION, token)
+						.header("Idempotency-Key", idempotencyKey)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(body))
+				.andExpect(status().isCreated())
+				.andExpect(jsonPath("$.data.id").value(firstSignalId.toString()));
+
+		mockMvc.perform(get("/api/v1/links/{linkId}/signals", linkId)
+						.header(HttpHeaders.AUTHORIZATION, token))
+				.andExpect(jsonPath("$.data.items.length()").value(1));
+	}
+
+	@Test
+	void updateRejectsABlankName() throws Exception {
+		UUID linkId = UUID.randomUUID();
+		Signal signal = signalRepository.saveAndFlush(Signal.createCustom(linkId, "이름", null, SignalCategory.CHECK,
+				"icon", List.of(RhythmBeat.SHORT, RhythmBeat.LONG)));
+		String body = objectMapper.writeValueAsString(new UpdateSignalRequest("", null, null, null, null));
+
+		mockMvc.perform(patch("/api/v1/links/{linkId}/signals/{signalId}", linkId, signal.getId())
+						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID()))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(body))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
 	}
 
 	@Test

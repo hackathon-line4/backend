@@ -55,6 +55,17 @@ class SignalMutationTest {
 	}
 
 	@Test
+	void stampingAnIdempotencyKeyMakesItReadableAgain() {
+		Signal signal = Signal.createCustom(linkId, "이름", null, SignalCategory.CHECK, "icon",
+				List.of(RhythmBeat.SHORT, RhythmBeat.LONG));
+		UUID idempotencyKey = UUID.randomUUID();
+
+		signal.stampIdempotencyKey(idempotencyKey);
+
+		assertThat(signal.getIdempotencyKey()).isEqualTo(idempotencyKey);
+	}
+
+	@Test
 	void templateSignalStillAllowsDescriptionCategoryAndIconChanges() {
 		Signal signal = Signal.fromTemplate(linkId, UUID.randomUUID(), "기본 신호", null,
 				SignalCategory.CHECK, "icon", List.of(RhythmBeat.SHORT, RhythmBeat.LONG));

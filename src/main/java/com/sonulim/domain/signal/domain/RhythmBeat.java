@@ -33,12 +33,12 @@ public enum RhythmBeat {
 	 */
 	public static List<RhythmBeat> parseAll(List<String> tokens) {
 		if (tokens == null || tokens.size() < MIN_BEATS || tokens.size() > MAX_BEATS) {
-			throw new SonulimException(ErrorCode.RHYTHM_INVALID, "박자는 2~5개여야 해요");
+			throw SonulimException.forField(ErrorCode.RHYTHM_INVALID, "박자는 2개에서 5개까지 넣을 수 있어요", "rhythm");
 		}
 		try {
 			return tokens.stream().map(RhythmBeat::valueOf).toList();
 		} catch (IllegalArgumentException e) {
-			throw new SonulimException(ErrorCode.RHYTHM_INVALID, "박자 값이 올바르지 않아요");
+			throw SonulimException.forField(ErrorCode.RHYTHM_INVALID, "박자 값이 올바르지 않아요", "rhythm");
 		}
 	}
 

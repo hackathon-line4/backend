@@ -50,7 +50,7 @@ class SignalQueryServiceTest {
 				List.of(RhythmBeat.SHORT, RhythmBeat.LONG));
 		given(signalRepository.findByLinkIdAndDeletedAtIsNull(linkId)).willReturn(List.of(signal));
 
-		List<Signal> result = service.list(linkId, requesterId, "GUARDIAN");
+		List<Signal> result = service.list(linkId, requesterId, "GUARDIAN", null);
 
 		verify(linkAccessGuard).verifyAccessible(linkId, requesterId);
 		assertThat(result).containsExactly(signal);
@@ -61,7 +61,7 @@ class SignalQueryServiceTest {
 		service = service();
 		given(signalRepository.findByLinkIdAndDeletedAtIsNull(linkId)).willReturn(List.of());
 
-		List<Signal> result = service.list(linkId, requesterId, "GUARDIAN");
+		List<Signal> result = service.list(linkId, requesterId, "GUARDIAN", null);
 
 		verify(linkAccessGuard).verifyAccessible(linkId, requesterId);
 		assertThat(result).isEmpty();
@@ -72,7 +72,7 @@ class SignalQueryServiceTest {
 		service = service();
 		doThrowOnGuard();
 
-		assertThatThrownBy(() -> service.list(linkId, requesterId, "GUARDIAN"))
+		assertThatThrownBy(() -> service.list(linkId, requesterId, "GUARDIAN", null))
 				.isInstanceOf(SonulimException.class)
 				.extracting(e -> ((SonulimException) e).getErrorCode())
 				.isEqualTo(ErrorCode.NOT_FOUND);
@@ -83,11 +83,55 @@ class SignalQueryServiceTest {
 	void listRejectsARequesterWhoIsNotAGuardianBeforeTouchingTheGuardOrRepository() {
 		service = service();
 
-		assertThatThrownBy(() -> service.list(linkId, requesterId, "RECIPIENT"))
+		assertThatThrownBy(() -> service.list(linkId, requesterId, "RECIPIENT", null))
 				.isInstanceOf(SonulimException.class)
 				.extracting(e -> ((SonulimException) e).getErrorCode())
 				.isEqualTo(ErrorCode.ROLE_MISMATCH);
 		verifyNoInteractions(linkAccessGuard, signalRepository);
+	}
+
+	@Test
+	void listSortsByCategoryOrderThenByCreationOrderWithinEachCategory() {
+		service = service();
+		// getCreatedAt()은 카테고리만으로 순서가 갈리는 쌍에서는 호출되지 않을 수 있어
+		// lenient로 둔다 — 검증 대상은 최종 정렬 결과다.
+		Signal emergency = org.mockito.Mockito.mock(Signal.class);
+		given(emergency.getCategory()).willReturn(SignalCategory.EMERGENCY);
+		org.mockito.Mockito.lenient().when(emergency.getCreatedAt())
+				.thenReturn(java.time.LocalDateTime.of(2026, 1, 1, 0, 0));
+		Signal dailyOlder = org.mockito.Mockito.mock(Signal.class);
+		given(dailyOlder.getCategory()).willReturn(SignalCategory.DAILY);
+		org.mockito.Mockito.lenient().when(dailyOlder.getCreatedAt())
+				.thenReturn(java.time.LocalDateTime.of(2026, 1, 1, 0, 0));
+		Signal dailyNewer = org.mockito.Mockito.mock(Signal.class);
+		given(dailyNewer.getCategory()).willReturn(SignalCategory.DAILY);
+		org.mockito.Mockito.lenient().when(dailyNewer.getCreatedAt())
+				.thenReturn(java.time.LocalDateTime.of(2026, 1, 2, 0, 0));
+		Signal outing = org.mockito.Mockito.mock(Signal.class);
+		given(outing.getCategory()).willReturn(SignalCategory.OUTING);
+		org.mockito.Mockito.lenient().when(outing.getCreatedAt())
+				.thenReturn(java.time.LocalDateTime.of(2026, 1, 1, 0, 0));
+		// 일부러 뒤섞인 순서로 돌려줘서 정렬이 실제로 적용되는지 확인한다.
+		given(signalRepository.findByLinkIdAndDeletedAtIsNull(linkId))
+				.willReturn(List.of(emergency, outing, dailyNewer, dailyOlder));
+
+		List<Signal> result = service.list(linkId, requesterId, "GUARDIAN", null);
+
+		assertThat(result).containsExactly(dailyOlder, dailyNewer, outing, emergency);
+	}
+
+	@Test
+	void listFiltersByCategoryWhenGiven() {
+		service = service();
+		Signal daily = Signal.createCustom(linkId, "일상", null, SignalCategory.DAILY, "icon",
+				List.of(RhythmBeat.SHORT, RhythmBeat.LONG));
+		Signal outing = Signal.createCustom(linkId, "외출", null, SignalCategory.OUTING, "icon",
+				List.of(RhythmBeat.LONG, RhythmBeat.LONG));
+		given(signalRepository.findByLinkIdAndDeletedAtIsNull(linkId)).willReturn(List.of(daily, outing));
+
+		List<Signal> result = service.list(linkId, requesterId, "GUARDIAN", SignalCategory.OUTING);
+
+		assertThat(result).containsExactly(outing);
 	}
 
 	@Test
