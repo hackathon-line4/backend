@@ -16,6 +16,7 @@ public enum RhythmBeat {
 
 	private static final int MIN_BEATS = 2;
 	private static final int MAX_BEATS = 5;
+	private static final long GAP_MS = 300;
 
 	private final long durationMs;
 
@@ -39,5 +40,15 @@ public enum RhythmBeat {
 		} catch (IllegalArgumentException e) {
 			throw new SonulimException(ErrorCode.RHYTHM_INVALID, "박자 값이 올바르지 않아요");
 		}
+	}
+
+	/**
+	 * 공통 데이터 형식 문서 기준: 박자 길이 합 + 박자 사이 간격(300ms) * (박자 수 - 1).
+	 * 마지막 박자 뒤에는 간격을 더하지 않는다 — 예시(SHORT,SHORT,LONG -> 1900ms)로 검증됨.
+	 */
+	public static long totalDurationMs(List<RhythmBeat> rhythm) {
+		long beatsTotal = rhythm.stream().mapToLong(RhythmBeat::getDurationMs).sum();
+		long gaps = (long) (rhythm.size() - 1) * GAP_MS;
+		return beatsTotal + gaps;
 	}
 }

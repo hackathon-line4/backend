@@ -36,47 +36,65 @@ class RhythmCheckControllerTest {
 
 	private final ObjectMapper objectMapper = new ObjectMapper();
 
-	private String bearerTokenFor(UUID userId) {
-		return "Bearer " + jwtTokenProvider.createAccessToken(userId, "GUARDIAN");
+	private String bearerTokenFor(UUID userId, String role) {
+		return "Bearer " + jwtTokenProvider.createAccessToken(userId, role);
 	}
 
 	@Test
-	void reportsNoDuplicateWhenNothingMatches() throws Exception {
+	void reportsValidWithDurationWhenNothingMatches() throws Exception {
 		UUID linkId = UUID.randomUUID();
-		String body = objectMapper.writeValueAsString(new RhythmCheckRequest(List.of("SHORT", "LONG")));
+		String body = objectMapper.writeValueAsString(new RhythmCheckRequest(List.of("SHORT", "LONG"), null));
 
 		mockMvc.perform(post("/api/v1/links/{linkId}/signals/rhythm-check", linkId)
-						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID()))
+						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID(), "GUARDIAN"))
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(body))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.data.duplicate").value(false))
-				.andExpect(jsonPath("$.data.conflictingSignalName").doesNotExist());
+				.andExpect(jsonPath("$.data.valid").value(true))
+				.andExpect(jsonPath("$.data.durationMs").value(1400))
+				.andExpect(jsonPath("$.data.conflictSignal").doesNotExist());
 	}
 
 	@Test
-	void reportsDuplicateWithConflictingSignalName() throws Exception {
+	void reportsInvalidWithConflictingSignal() throws Exception {
 		UUID linkId = UUID.randomUUID();
-		signalRepository.saveAndFlush(Signal.createCustom(linkId, "가자", null, SignalCategory.OUTING, "icon",
-				List.of(RhythmBeat.SHORT, RhythmBeat.LONG)));
-		String body = objectMapper.writeValueAsString(new RhythmCheckRequest(List.of("SHORT", "LONG")));
+		Signal existing = signalRepository.saveAndFlush(Signal.createCustom(linkId, "가자", null,
+				SignalCategory.OUTING, "icon", List.of(RhythmBeat.SHORT, RhythmBeat.LONG)));
+		String body = objectMapper.writeValueAsString(new RhythmCheckRequest(List.of("SHORT", "LONG"), null));
 
 		mockMvc.perform(post("/api/v1/links/{linkId}/signals/rhythm-check", linkId)
-						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID()))
+						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID(), "GUARDIAN"))
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(body))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.data.duplicate").value(true))
-				.andExpect(jsonPath("$.data.conflictingSignalName").value("가자"));
+				.andExpect(jsonPath("$.data.valid").value(false))
+				.andExpect(jsonPath("$.data.conflictSignal.id").value(existing.getId().toString()))
+				.andExpect(jsonPath("$.data.conflictSignal.name").value("가자"));
+	}
+
+	@Test
+	void excludeSignalIdLeavesTheSignalBeingEditedOutOfTheComparison() throws Exception {
+		UUID linkId = UUID.randomUUID();
+		Signal beingEdited = signalRepository.saveAndFlush(Signal.createCustom(linkId, "가자", null,
+				SignalCategory.OUTING, "icon", List.of(RhythmBeat.SHORT, RhythmBeat.LONG)));
+		String body = objectMapper.writeValueAsString(
+				new RhythmCheckRequest(List.of("SHORT", "LONG"), beingEdited.getId()));
+
+		mockMvc.perform(post("/api/v1/links/{linkId}/signals/rhythm-check", linkId)
+						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID(), "GUARDIAN"))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(body))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.valid").value(true));
 	}
 
 	@Test
 	void rejectsAnInvalidRhythmWith400() throws Exception {
 		UUID linkId = UUID.randomUUID();
-		String body = objectMapper.writeValueAsString(new RhythmCheckRequest(List.of("SHORT")));
+		String body = objectMapper.writeValueAsString(new RhythmCheckRequest(List.of("SHORT"), null));
 
 		mockMvc.perform(post("/api/v1/links/{linkId}/signals/rhythm-check", linkId)
-						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID()))
+						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID(), "GUARDIAN"))
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(body))
 				.andExpect(status().isBadRequest())
@@ -84,9 +102,22 @@ class RhythmCheckControllerTest {
 	}
 
 	@Test
+	void rejectsARequesterWhoIsNotAGuardianWith403() throws Exception {
+		UUID linkId = UUID.randomUUID();
+		String body = objectMapper.writeValueAsString(new RhythmCheckRequest(List.of("SHORT", "LONG"), null));
+
+		mockMvc.perform(post("/api/v1/links/{linkId}/signals/rhythm-check", linkId)
+						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID(), "RECIPIENT"))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(body))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.error.code").value("ROLE_MISMATCH"));
+	}
+
+	@Test
 	void requiresAuthentication() throws Exception {
 		UUID linkId = UUID.randomUUID();
-		String body = objectMapper.writeValueAsString(new RhythmCheckRequest(List.of("SHORT", "LONG")));
+		String body = objectMapper.writeValueAsString(new RhythmCheckRequest(List.of("SHORT", "LONG"), null));
 
 		mockMvc.perform(post("/api/v1/links/{linkId}/signals/rhythm-check", linkId)
 						.contentType(MediaType.APPLICATION_JSON)

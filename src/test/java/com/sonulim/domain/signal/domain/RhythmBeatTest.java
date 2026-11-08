@@ -50,4 +50,11 @@ class RhythmBeatTest {
 				.extracting(e -> ((SonulimException) e).getErrorCode())
 				.isEqualTo(ErrorCode.RHYTHM_INVALID);
 	}
+
+	@Test
+	void sumsBeatDurationsPlusGapsBetweenBeatsButNotAfterTheLastOne() {
+		long durationMs = RhythmBeat.totalDurationMs(List.of(RhythmBeat.SHORT, RhythmBeat.SHORT, RhythmBeat.LONG));
+
+		assertThat(durationMs).isEqualTo(1900);
+	}
 }

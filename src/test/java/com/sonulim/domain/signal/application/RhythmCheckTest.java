@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class RhythmCheckTest {
@@ -38,32 +39,56 @@ class RhythmCheckTest {
 	}
 
 	@Test
-	void verifiesAccessThenReportsNoDuplicateWhenNothingMatches() {
-		RhythmCheckResult result = service().checkRhythm(linkId, requesterId, List.of("SHORT", "LONG"));
+	void verifiesAccessThenReportsValidWithDurationWhenNothingMatches() {
+		RhythmCheckResult result = service().checkRhythm(linkId, requesterId, "GUARDIAN", List.of("SHORT", "LONG"),
+				null);
 
 		verify(linkAccessGuard).verifyAccessible(linkId, requesterId);
-		assertThat(result.duplicate()).isFalse();
-		assertThat(result.conflictingSignalName()).isNull();
+		assertThat(result.valid()).isTrue();
+		assertThat(result.durationMs()).isEqualTo(1400);
+		assertThat(result.conflictSignal()).isNull();
 	}
 
 	@Test
-	void reportsDuplicateWithTheConflictingSignalsName() {
+	void reportsInvalidWithTheConflictingSignal() {
 		Signal existing = Signal.createCustom(linkId, "가자", null, SignalCategory.OUTING, "icon",
 				List.of(RhythmBeat.SHORT, RhythmBeat.LONG));
 		given(signalRepository.findByLinkIdAndRhythm(linkId, List.of(RhythmBeat.SHORT, RhythmBeat.LONG), null))
 				.willReturn(Optional.of(existing));
 
-		RhythmCheckResult result = service().checkRhythm(linkId, requesterId, List.of("SHORT", "LONG"));
+		RhythmCheckResult result = service().checkRhythm(linkId, requesterId, "GUARDIAN", List.of("SHORT", "LONG"),
+				null);
 
-		assertThat(result.duplicate()).isTrue();
-		assertThat(result.conflictingSignalName()).isEqualTo("가자");
+		assertThat(result.valid()).isFalse();
+		assertThat(result.durationMs()).isEqualTo(1400);
+		assertThat(result.conflictSignal().name()).isEqualTo("가자");
+	}
+
+	@Test
+	void passesExcludeSignalIdThroughToTheRepositoryLookup() {
+		UUID excludeSignalId = UUID.randomUUID();
+
+		service().checkRhythm(linkId, requesterId, "GUARDIAN", List.of("SHORT", "LONG"), excludeSignalId);
+
+		verify(signalRepository).findByLinkIdAndRhythm(linkId, List.of(RhythmBeat.SHORT, RhythmBeat.LONG),
+				excludeSignalId);
 	}
 
 	@Test
 	void rejectsAnInvalidRhythmBeforeCheckingDuplicates() {
-		assertThatThrownBy(() -> service().checkRhythm(linkId, requesterId, List.of("SHORT")))
+		assertThatThrownBy(() -> service().checkRhythm(linkId, requesterId, "GUARDIAN", List.of("SHORT"), null))
 				.isInstanceOf(SonulimException.class)
 				.extracting(e -> ((SonulimException) e).getErrorCode())
 				.isEqualTo(ErrorCode.RHYTHM_INVALID);
+	}
+
+	@Test
+	void rejectsARequesterWhoIsNotAGuardianBeforeTouchingTheGuardOrRepository() {
+		assertThatThrownBy(
+				() -> service().checkRhythm(linkId, requesterId, "RECIPIENT", List.of("SHORT", "LONG"), null))
+				.isInstanceOf(SonulimException.class)
+				.extracting(e -> ((SonulimException) e).getErrorCode())
+				.isEqualTo(ErrorCode.ROLE_MISMATCH);
+		verifyNoInteractions(linkAccessGuard, signalRepository);
 	}
 }

@@ -40,7 +40,11 @@ class SignalControllerTest {
 	private final ObjectMapper objectMapper = new ObjectMapper();
 
 	private String bearerTokenFor(UUID userId) {
-		return "Bearer " + jwtTokenProvider.createAccessToken(userId, "GUARDIAN");
+		return bearerTokenFor(userId, "GUARDIAN");
+	}
+
+	private String bearerTokenFor(UUID userId, String role) {
+		return "Bearer " + jwtTokenProvider.createAccessToken(userId, role);
 	}
 
 	@Test
@@ -51,8 +55,8 @@ class SignalControllerTest {
 						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID())))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.ok").value(true))
-				.andExpect(jsonPath("$.data").isArray())
-				.andExpect(jsonPath("$.data").isEmpty());
+				.andExpect(jsonPath("$.data.items").isArray())
+				.andExpect(jsonPath("$.data.items").isEmpty());
 	}
 
 	@Test
@@ -64,12 +68,20 @@ class SignalControllerTest {
 		mockMvc.perform(get("/api/v1/links/{linkId}/signals", linkId)
 						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID())))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.data[0].name").value("약 먹을 시간"))
-				.andExpect(jsonPath("$.data[0].source").value("CUSTOM"))
-				.andExpect(jsonPath("$.data[0].category").value("DAILY"))
-				.andExpect(jsonPath("$.data[0].rhythm[0]").value("SHORT"))
-				.andExpect(jsonPath("$.data[0].durationMs").value(1900))
-				.andExpect(jsonPath("$.data[0].practiced").value(false));
+				.andExpect(jsonPath("$.data.items[0].name").value("약 먹을 시간"))
+				.andExpect(jsonPath("$.data.items[0].source").value("CUSTOM"))
+				.andExpect(jsonPath("$.data.items[0].category").value("DAILY"))
+				.andExpect(jsonPath("$.data.items[0].rhythm[0]").value("SHORT"))
+				.andExpect(jsonPath("$.data.items[0].durationMs").value(1900))
+				.andExpect(jsonPath("$.data.items[0].practiced").value(false));
+	}
+
+	@Test
+	void listRejectsARequesterWhoIsNotAGuardianWith403() throws Exception {
+		mockMvc.perform(get("/api/v1/links/{linkId}/signals", UUID.randomUUID())
+						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID(), "RECIPIENT")))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.error.code").value("ROLE_MISMATCH"));
 	}
 
 	@Test
@@ -103,6 +115,14 @@ class SignalControllerTest {
 						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID())))
 				.andExpect(status().isNotFound())
 				.andExpect(jsonPath("$.error.code").value("NOT_FOUND"));
+	}
+
+	@Test
+	void detailRejectsARequesterWhoIsNotAGuardianWith403() throws Exception {
+		mockMvc.perform(get("/api/v1/links/{linkId}/signals/{signalId}", UUID.randomUUID(), UUID.randomUUID())
+						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID(), "RECIPIENT")))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.error.code").value("ROLE_MISMATCH"));
 	}
 
 	@Test
@@ -165,7 +185,7 @@ class SignalControllerTest {
 				.andExpect(status().isNotFound());
 		mockMvc.perform(get("/api/v1/links/{linkId}/signals", linkId)
 						.header(HttpHeaders.AUTHORIZATION, token))
-				.andExpect(jsonPath("$.data").isEmpty());
+				.andExpect(jsonPath("$.data.items").isEmpty());
 	}
 
 	@Test
@@ -213,6 +233,20 @@ class SignalControllerTest {
 	}
 
 	@Test
+	void createRejectsARequesterWhoIsNotAGuardianWith403() throws Exception {
+		UUID linkId = UUID.randomUUID();
+		String body = objectMapper.writeValueAsString(
+				new CreateSignalRequest("이름", null, SignalCategory.CHECK, "icon", List.of("SHORT", "LONG")));
+
+		mockMvc.perform(post("/api/v1/links/{linkId}/signals", linkId)
+						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID(), "RECIPIENT"))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(body))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.error.code").value("ROLE_MISMATCH"));
+	}
+
+	@Test
 	void updateRejectsNameOrRhythmChangeOnATemplateSignal() throws Exception {
 		UUID linkId = UUID.randomUUID();
 		Signal templateSignal = signalRepository.saveAndFlush(Signal.fromTemplate(linkId, UUID.randomUUID(),
@@ -229,6 +263,20 @@ class SignalControllerTest {
 	}
 
 	@Test
+	void updateRejectsARequesterWhoIsNotAGuardianWith403() throws Exception {
+		UUID linkId = UUID.randomUUID();
+		String body = objectMapper.writeValueAsString(
+				new UpdateSignalRequest("바꾼 이름", null, null, null, null));
+
+		mockMvc.perform(patch("/api/v1/links/{linkId}/signals/{signalId}", linkId, UUID.randomUUID())
+						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID(), "RECIPIENT"))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(body))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.error.code").value("ROLE_MISMATCH"));
+	}
+
+	@Test
 	void deleteReturns404ForASignalFromADifferentLink() throws Exception {
 		UUID actualLinkId = UUID.randomUUID();
 		Signal signal = signalRepository.saveAndFlush(Signal.createCustom(actualLinkId, "신호", null,
@@ -237,5 +285,13 @@ class SignalControllerTest {
 		mockMvc.perform(delete("/api/v1/links/{linkId}/signals/{signalId}", UUID.randomUUID(), signal.getId())
 						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID())))
 				.andExpect(status().isNotFound());
+	}
+
+	@Test
+	void deleteRejectsARequesterWhoIsNotAGuardianWith403() throws Exception {
+		mockMvc.perform(delete("/api/v1/links/{linkId}/signals/{signalId}", UUID.randomUUID(), UUID.randomUUID())
+						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID(), "RECIPIENT")))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.error.code").value("ROLE_MISMATCH"));
 	}
 }

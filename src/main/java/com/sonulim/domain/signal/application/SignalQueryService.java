@@ -22,7 +22,8 @@ public class SignalQueryService {
 		this.linkAccessGuard = linkAccessGuard;
 	}
 
-	public List<Signal> list(UUID linkId, UUID requesterId) {
+	public List<Signal> list(UUID linkId, UUID requesterId, String role) {
+		GuardianOnly.require(role);
 		linkAccessGuard.verifyAccessible(linkId, requesterId);
 		return signalRepository.findByLinkIdAndDeletedAtIsNull(linkId);
 	}
@@ -32,7 +33,8 @@ public class SignalQueryService {
 	 * linkId가 아니라). 그래서 접근 권한이 있어도 경로의 linkId가 신호의 실제 linkId와
 	 * 다르면 다른 연결의 신호를 가리키는 거라 똑같이 404로 처리한다.
 	 */
-	public Signal getDetail(UUID pathLinkId, UUID signalId, UUID requesterId) {
+	public Signal getDetail(UUID pathLinkId, UUID signalId, UUID requesterId, String role) {
+		GuardianOnly.require(role);
 		Signal signal = signalRepository.findByIdAndDeletedAtIsNull(signalId)
 				.orElseThrow(() -> new SonulimException(ErrorCode.NOT_FOUND, "신호를 찾을 수 없어요"));
 
@@ -47,14 +49,19 @@ public class SignalQueryService {
 
 	/**
 	 * M-3 직접 만들기: 저장 전에 같은 연결 안에 동일한 리듬이 있는지 미리 알려준다. 생성 API의
-	 * 409 RHYTHM_DUPLICATE와 달리, 중복이어도 에러가 아니라 정상 응답(duplicate: true)이다 —
-	 * 저장을 막을지는 프론트가 이 값을 보고 판단한다.
+	 * 409 RHYTHM_DUPLICATE와 달리, 중복이어도 에러가 아니라 정상 응답(valid: false)이다 —
+	 * 저장을 막을지는 프론트가 이 값을 보고 판단한다. excludeSignalId는 수정 중인 신호를
+	 * 비교에서 빼기 위한 것(새로 만들 때는 null).
 	 */
-	public RhythmCheckResult checkRhythm(UUID linkId, UUID requesterId, List<String> rhythmTokens) {
+	public RhythmCheckResult checkRhythm(UUID linkId, UUID requesterId, String role, List<String> rhythmTokens,
+			UUID excludeSignalId) {
+		GuardianOnly.require(role);
 		linkAccessGuard.verifyAccessible(linkId, requesterId);
 		List<RhythmBeat> rhythm = RhythmBeat.parseAll(rhythmTokens);
-		return signalRepository.findByLinkIdAndRhythm(linkId, rhythm, null)
-				.map(conflicting -> new RhythmCheckResult(true, conflicting.getName()))
-				.orElseGet(() -> new RhythmCheckResult(false, null));
+		long durationMs = RhythmBeat.totalDurationMs(rhythm);
+		return signalRepository.findByLinkIdAndRhythm(linkId, rhythm, excludeSignalId)
+				.map(conflicting -> new RhythmCheckResult(false, durationMs,
+						new RhythmCheckResult.ConflictSignal(conflicting.getId(), conflicting.getName())))
+				.orElseGet(() -> new RhythmCheckResult(true, durationMs, null));
 	}
 }

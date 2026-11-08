@@ -27,8 +27,6 @@ import jakarta.persistence.Table;
 @Table(name = "signals")
 public class Signal extends BaseEntity {
 
-	private static final long GAP_MS = 300;
-
 	@Id
 	@GeneratedValue(strategy = GenerationType.UUID)
 	private UUID id;
@@ -138,9 +136,7 @@ public class Signal extends BaseEntity {
 	 * 마지막 박자 뒤에는 간격을 더하지 않는다 — 예시(SHORT,SHORT,LONG -> 1900ms)로 검증됨.
 	 */
 	public long calculateDurationMs() {
-		long beatsTotal = rhythm.stream().mapToLong(RhythmBeat::getDurationMs).sum();
-		long gaps = (long) (rhythm.size() - 1) * GAP_MS;
-		return beatsTotal + gaps;
+		return RhythmBeat.totalDurationMs(rhythm);
 	}
 
 	public UUID getId() {

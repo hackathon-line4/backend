@@ -33,47 +33,49 @@ public class SignalController {
 	}
 
 	@GetMapping
-	public ApiResponse<List<SignalResponse>> list(@PathVariable UUID linkId,
+	public ApiResponse<SignalListResponse> list(@PathVariable UUID linkId,
 			@AuthenticationPrincipal AuthenticatedUser user) {
-		List<SignalResponse> signals = signalQueryService.list(linkId, user.userId()).stream()
+		List<SignalResponse> signals = signalQueryService.list(linkId, user.userId(), user.role()).stream()
 				.map(SignalResponse::from)
 				.toList();
-		return ApiResponse.success(signals);
+		return ApiResponse.success(new SignalListResponse(signals));
 	}
 
 	@GetMapping("/{signalId}")
 	public ApiResponse<SignalResponse> detail(@PathVariable UUID linkId, @PathVariable UUID signalId,
 			@AuthenticationPrincipal AuthenticatedUser user) {
-		SignalResponse response = SignalResponse.from(signalQueryService.getDetail(linkId, signalId, user.userId()));
+		SignalResponse response = SignalResponse
+				.from(signalQueryService.getDetail(linkId, signalId, user.userId(), user.role()));
 		return ApiResponse.success(response);
 	}
 
 	@PostMapping
 	public ResponseEntity<ApiResponse<SignalResponse>> create(@PathVariable UUID linkId,
 			@Valid @RequestBody CreateSignalRequest request, @AuthenticationPrincipal AuthenticatedUser user) {
-		var signal = signalCommandService.create(linkId, user.userId(), request.name(), request.description(),
-				request.category(), request.icon(), request.rhythm());
+		var signal = signalCommandService.create(linkId, user.userId(), user.role(), request.name(),
+				request.description(), request.category(), request.icon(), request.rhythm());
 		return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(SignalResponse.from(signal)));
 	}
 
 	@PatchMapping("/{signalId}")
 	public ApiResponse<SignalResponse> update(@PathVariable UUID linkId, @PathVariable UUID signalId,
 			@Valid @RequestBody UpdateSignalRequest request, @AuthenticationPrincipal AuthenticatedUser user) {
-		var signal = signalCommandService.update(linkId, signalId, user.userId(), request.toCommand());
+		var signal = signalCommandService.update(linkId, signalId, user.userId(), user.role(), request.toCommand());
 		return ApiResponse.success(SignalResponse.from(signal));
 	}
 
 	@DeleteMapping("/{signalId}")
 	public ResponseEntity<Void> delete(@PathVariable UUID linkId, @PathVariable UUID signalId,
 			@AuthenticationPrincipal AuthenticatedUser user) {
-		signalCommandService.delete(linkId, signalId, user.userId());
+		signalCommandService.delete(linkId, signalId, user.userId(), user.role());
 		return ResponseEntity.noContent().build();
 	}
 
 	@PostMapping("/rhythm-check")
 	public ApiResponse<RhythmCheckResponse> checkRhythm(@PathVariable UUID linkId,
 			@Valid @RequestBody RhythmCheckRequest request, @AuthenticationPrincipal AuthenticatedUser user) {
-		var result = signalQueryService.checkRhythm(linkId, user.userId(), request.rhythm());
+		var result = signalQueryService.checkRhythm(linkId, user.userId(), user.role(), request.rhythm(),
+				request.excludeSignalId());
 		return ApiResponse.success(RhythmCheckResponse.from(result));
 	}
 }

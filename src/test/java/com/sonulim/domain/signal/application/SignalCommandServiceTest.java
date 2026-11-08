@@ -22,6 +22,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class SignalCommandServiceTest {
@@ -46,7 +47,7 @@ class SignalCommandServiceTest {
 		SignalCommandService service = service();
 		given(signalRepository.save(any())).willAnswer(invocation -> invocation.getArgument(0));
 
-		Signal result = service.create(linkId, requesterId, "이름", "설명", SignalCategory.CHECK, "icon",
+		Signal result = service.create(linkId, requesterId, "GUARDIAN", "이름", "설명", SignalCategory.CHECK, "icon",
 				List.of("SHORT", "LONG"));
 
 		verify(linkAccessGuard).verifyAccessible(linkId, requesterId);
@@ -55,11 +56,23 @@ class SignalCommandServiceTest {
 	}
 
 	@Test
+	void createRejectsARequesterWhoIsNotAGuardianBeforeTouchingTheGuardOrRepository() {
+		SignalCommandService service = service();
+
+		assertThatThrownBy(() -> service.create(linkId, requesterId, "RECIPIENT", "이름", null, SignalCategory.CHECK,
+				"icon", List.of("SHORT", "LONG")))
+				.isInstanceOf(SonulimException.class)
+				.extracting(e -> ((SonulimException) e).getErrorCode())
+				.isEqualTo(ErrorCode.ROLE_MISMATCH);
+		verifyNoInteractions(linkAccessGuard, signalRepository);
+	}
+
+	@Test
 	void createRejectsInvalidRhythmBeforeTouchingTheRepository() {
 		SignalCommandService service = service();
 
-		assertThatThrownBy(() -> service.create(linkId, requesterId, "이름", null, SignalCategory.CHECK, "icon",
-				List.of("SHORT")))
+		assertThatThrownBy(() -> service.create(linkId, requesterId, "GUARDIAN", "이름", null, SignalCategory.CHECK,
+				"icon", List.of("SHORT")))
 				.isInstanceOf(SonulimException.class)
 				.extracting(e -> ((SonulimException) e).getErrorCode())
 				.isEqualTo(ErrorCode.RHYTHM_INVALID);
@@ -74,8 +87,8 @@ class SignalCommandServiceTest {
 		given(signalRepository.findByLinkIdAndRhythm(linkId, List.of(RhythmBeat.SHORT, RhythmBeat.LONG), null))
 				.willReturn(Optional.of(existing));
 
-		assertThatThrownBy(() -> service.create(linkId, requesterId, "새 이름", null, SignalCategory.CHECK, "icon",
-				List.of("SHORT", "LONG")))
+		assertThatThrownBy(() -> service.create(linkId, requesterId, "GUARDIAN", "새 이름", null, SignalCategory.CHECK,
+				"icon", List.of("SHORT", "LONG")))
 				.isInstanceOf(SonulimException.class)
 				.extracting(e -> ((SonulimException) e).getErrorCode())
 				.isEqualTo(ErrorCode.RHYTHM_DUPLICATE);
@@ -92,12 +105,24 @@ class SignalCommandServiceTest {
 				List.of(RhythmBeat.SHORT, RhythmBeat.LONG));
 		given(signalRepository.findByIdAndDeletedAtIsNull(signalId)).willReturn(Optional.of(signal));
 
-		Signal result = service.update(linkId, signalId, requesterId,
+		Signal result = service.update(linkId, signalId, requesterId, "GUARDIAN",
 				new UpdateSignalCommand("새 이름", null, null, null, null));
 
 		verify(linkAccessGuard).verifyAccessible(linkId, requesterId);
 		assertThat(result.getName()).isEqualTo("새 이름");
 		assertThat(result.getDescription()).isEqualTo("설명");
+	}
+
+	@Test
+	void updateRejectsARequesterWhoIsNotAGuardianBeforeLookingUpTheSignal() {
+		SignalCommandService service = service();
+
+		assertThatThrownBy(() -> service.update(linkId, UUID.randomUUID(), requesterId, "RECIPIENT",
+				new UpdateSignalCommand("새 이름", null, null, null, null)))
+				.isInstanceOf(SonulimException.class)
+				.extracting(e -> ((SonulimException) e).getErrorCode())
+				.isEqualTo(ErrorCode.ROLE_MISMATCH);
+		verifyNoInteractions(linkAccessGuard, signalRepository);
 	}
 
 	@Test
@@ -111,7 +136,7 @@ class SignalCommandServiceTest {
 		given(signal.getLinkId()).willReturn(linkId);
 		given(signalRepository.findByIdAndDeletedAtIsNull(signalId)).willReturn(Optional.of(signal));
 
-		Signal result = service.update(linkId, signalId, requesterId,
+		Signal result = service.update(linkId, signalId, requesterId, "GUARDIAN",
 				new UpdateSignalCommand(null, null, null, null, List.of("SHORT", "LONG")));
 
 		assertThat(result).isSameAs(signal);
@@ -130,7 +155,7 @@ class SignalCommandServiceTest {
 		given(signalRepository.findByLinkIdAndRhythm(linkId, List.of(RhythmBeat.LONG, RhythmBeat.LONG), null))
 				.willReturn(Optional.of(other));
 
-		assertThatThrownBy(() -> service.update(linkId, signalId, requesterId,
+		assertThatThrownBy(() -> service.update(linkId, signalId, requesterId, "GUARDIAN",
 				new UpdateSignalCommand(null, null, null, null, List.of("LONG", "LONG"))))
 				.isInstanceOf(SonulimException.class)
 				.extracting(e -> ((SonulimException) e).getErrorCode())
@@ -143,7 +168,7 @@ class SignalCommandServiceTest {
 		UUID signalId = UUID.randomUUID();
 		given(signalRepository.findByIdAndDeletedAtIsNull(signalId)).willReturn(Optional.empty());
 
-		assertThatThrownBy(() -> service.update(linkId, signalId, requesterId,
+		assertThatThrownBy(() -> service.update(linkId, signalId, requesterId, "GUARDIAN",
 				new UpdateSignalCommand("이름", null, null, null, null)))
 				.isInstanceOf(SonulimException.class)
 				.extracting(e -> ((SonulimException) e).getErrorCode())
@@ -159,7 +184,7 @@ class SignalCommandServiceTest {
 				List.of(RhythmBeat.SHORT, RhythmBeat.LONG));
 		given(signalRepository.findByIdAndDeletedAtIsNull(signalId)).willReturn(Optional.of(signal));
 
-		assertThatThrownBy(() -> service.update(linkId, signalId, requesterId,
+		assertThatThrownBy(() -> service.update(linkId, signalId, requesterId, "GUARDIAN",
 				new UpdateSignalCommand("이름", null, null, null, null)))
 				.isInstanceOf(SonulimException.class)
 				.extracting(e -> ((SonulimException) e).getErrorCode())
@@ -174,7 +199,7 @@ class SignalCommandServiceTest {
 				SignalCategory.CHECK, "icon", List.of(RhythmBeat.SHORT, RhythmBeat.LONG));
 		given(signalRepository.findByIdAndDeletedAtIsNull(signalId)).willReturn(Optional.of(signal));
 
-		assertThatThrownBy(() -> service.update(linkId, signalId, requesterId,
+		assertThatThrownBy(() -> service.update(linkId, signalId, requesterId, "GUARDIAN",
 				new UpdateSignalCommand("바꾼 이름", null, null, null, null)))
 				.isInstanceOf(SonulimException.class)
 				.extracting(e -> ((SonulimException) e).getErrorCode())
@@ -191,7 +216,7 @@ class SignalCommandServiceTest {
 				List.of(RhythmBeat.SHORT, RhythmBeat.LONG));
 		given(signalRepository.findByIdAndDeletedAtIsNull(signalId)).willReturn(Optional.of(signal));
 
-		service.delete(linkId, signalId, requesterId);
+		service.delete(linkId, signalId, requesterId, "GUARDIAN");
 
 		verify(linkAccessGuard).verifyAccessible(linkId, requesterId);
 		assertThat(signal.getDeletedAt()).isNotNull();
@@ -203,9 +228,20 @@ class SignalCommandServiceTest {
 		UUID signalId = UUID.randomUUID();
 		given(signalRepository.findByIdAndDeletedAtIsNull(signalId)).willReturn(Optional.empty());
 
-		assertThatThrownBy(() -> service.delete(linkId, signalId, requesterId))
+		assertThatThrownBy(() -> service.delete(linkId, signalId, requesterId, "GUARDIAN"))
 				.isInstanceOf(SonulimException.class)
 				.extracting(e -> ((SonulimException) e).getErrorCode())
 				.isEqualTo(ErrorCode.NOT_FOUND);
+	}
+
+	@Test
+	void deleteRejectsARequesterWhoIsNotAGuardianBeforeLookingUpTheSignal() {
+		SignalCommandService service = service();
+
+		assertThatThrownBy(() -> service.delete(linkId, UUID.randomUUID(), requesterId, "RECIPIENT"))
+				.isInstanceOf(SonulimException.class)
+				.extracting(e -> ((SonulimException) e).getErrorCode())
+				.isEqualTo(ErrorCode.ROLE_MISMATCH);
+		verifyNoInteractions(linkAccessGuard, signalRepository);
 	}
 }

@@ -24,8 +24,9 @@ public class SignalCommandService {
 		this.linkAccessGuard = linkAccessGuard;
 	}
 
-	public Signal create(UUID linkId, UUID requesterId, String name, String description, SignalCategory category,
-			String icon, List<String> rhythmTokens) {
+	public Signal create(UUID linkId, UUID requesterId, String role, String name, String description,
+			SignalCategory category, String icon, List<String> rhythmTokens) {
+		GuardianOnly.require(role);
 		linkAccessGuard.verifyAccessible(linkId, requesterId);
 		List<RhythmBeat> rhythm = RhythmBeat.parseAll(rhythmTokens);
 		ensureRhythmNotDuplicated(linkId, rhythm, null);
@@ -34,7 +35,8 @@ public class SignalCommandService {
 	}
 
 	@Transactional
-	public Signal update(UUID pathLinkId, UUID signalId, UUID requesterId, UpdateSignalCommand command) {
+	public Signal update(UUID pathLinkId, UUID signalId, UUID requesterId, String role, UpdateSignalCommand command) {
+		GuardianOnly.require(role);
 		Signal signal = findAccessibleSignal(pathLinkId, signalId, requesterId);
 
 		if (command.rhythm() != null) {
@@ -58,7 +60,8 @@ public class SignalCommandService {
 	}
 
 	@Transactional
-	public void delete(UUID pathLinkId, UUID signalId, UUID requesterId) {
+	public void delete(UUID pathLinkId, UUID signalId, UUID requesterId, String role) {
+		GuardianOnly.require(role);
 		Signal signal = findAccessibleSignal(pathLinkId, signalId, requesterId);
 		signal.softDelete();
 	}

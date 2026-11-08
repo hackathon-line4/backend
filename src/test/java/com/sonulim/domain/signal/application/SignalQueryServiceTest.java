@@ -23,6 +23,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class SignalQueryServiceTest {
@@ -49,7 +50,7 @@ class SignalQueryServiceTest {
 				List.of(RhythmBeat.SHORT, RhythmBeat.LONG));
 		given(signalRepository.findByLinkIdAndDeletedAtIsNull(linkId)).willReturn(List.of(signal));
 
-		List<Signal> result = service.list(linkId, requesterId);
+		List<Signal> result = service.list(linkId, requesterId, "GUARDIAN");
 
 		verify(linkAccessGuard).verifyAccessible(linkId, requesterId);
 		assertThat(result).containsExactly(signal);
@@ -60,7 +61,7 @@ class SignalQueryServiceTest {
 		service = service();
 		given(signalRepository.findByLinkIdAndDeletedAtIsNull(linkId)).willReturn(List.of());
 
-		List<Signal> result = service.list(linkId, requesterId);
+		List<Signal> result = service.list(linkId, requesterId, "GUARDIAN");
 
 		verify(linkAccessGuard).verifyAccessible(linkId, requesterId);
 		assertThat(result).isEmpty();
@@ -71,11 +72,22 @@ class SignalQueryServiceTest {
 		service = service();
 		doThrowOnGuard();
 
-		assertThatThrownBy(() -> service.list(linkId, requesterId))
+		assertThatThrownBy(() -> service.list(linkId, requesterId, "GUARDIAN"))
 				.isInstanceOf(SonulimException.class)
 				.extracting(e -> ((SonulimException) e).getErrorCode())
 				.isEqualTo(ErrorCode.NOT_FOUND);
 		verify(signalRepository, never()).findByLinkIdAndDeletedAtIsNull(any());
+	}
+
+	@Test
+	void listRejectsARequesterWhoIsNotAGuardianBeforeTouchingTheGuardOrRepository() {
+		service = service();
+
+		assertThatThrownBy(() -> service.list(linkId, requesterId, "RECIPIENT"))
+				.isInstanceOf(SonulimException.class)
+				.extracting(e -> ((SonulimException) e).getErrorCode())
+				.isEqualTo(ErrorCode.ROLE_MISMATCH);
+		verifyNoInteractions(linkAccessGuard, signalRepository);
 	}
 
 	@Test
@@ -86,7 +98,7 @@ class SignalQueryServiceTest {
 		UUID signalId = UUID.randomUUID();
 		given(signalRepository.findByIdAndDeletedAtIsNull(signalId)).willReturn(Optional.of(signal));
 
-		Signal result = service.getDetail(linkId, signalId, requesterId);
+		Signal result = service.getDetail(linkId, signalId, requesterId, "GUARDIAN");
 
 		verify(linkAccessGuard).verifyAccessible(linkId, requesterId);
 		assertThat(result).isEqualTo(signal);
@@ -98,7 +110,7 @@ class SignalQueryServiceTest {
 		UUID signalId = UUID.randomUUID();
 		given(signalRepository.findByIdAndDeletedAtIsNull(signalId)).willReturn(Optional.empty());
 
-		assertThatThrownBy(() -> service.getDetail(linkId, signalId, requesterId))
+		assertThatThrownBy(() -> service.getDetail(linkId, signalId, requesterId, "GUARDIAN"))
 				.isInstanceOf(SonulimException.class)
 				.extracting(e -> ((SonulimException) e).getErrorCode())
 				.isEqualTo(ErrorCode.NOT_FOUND);
@@ -114,7 +126,7 @@ class SignalQueryServiceTest {
 		given(signalRepository.findByIdAndDeletedAtIsNull(signalId)).willReturn(Optional.of(signal));
 		doThrowOnGuard();
 
-		assertThatThrownBy(() -> service.getDetail(linkId, signalId, requesterId))
+		assertThatThrownBy(() -> service.getDetail(linkId, signalId, requesterId, "GUARDIAN"))
 				.isInstanceOf(SonulimException.class)
 				.extracting(e -> ((SonulimException) e).getErrorCode())
 				.isEqualTo(ErrorCode.NOT_FOUND);
@@ -130,11 +142,22 @@ class SignalQueryServiceTest {
 		UUID signalId = UUID.randomUUID();
 		given(signalRepository.findByIdAndDeletedAtIsNull(signalId)).willReturn(Optional.of(signal));
 
-		assertThatThrownBy(() -> service.getDetail(differentPathLinkId, signalId, requesterId))
+		assertThatThrownBy(() -> service.getDetail(differentPathLinkId, signalId, requesterId, "GUARDIAN"))
 				.isInstanceOf(SonulimException.class)
 				.extracting(e -> ((SonulimException) e).getErrorCode())
 				.isEqualTo(ErrorCode.NOT_FOUND);
 		verify(linkAccessGuard).verifyAccessible(eq(actualLinkId), eq(requesterId));
+	}
+
+	@Test
+	void detailRejectsARequesterWhoIsNotAGuardianBeforeLookingUpTheSignal() {
+		service = service();
+
+		assertThatThrownBy(() -> service.getDetail(linkId, UUID.randomUUID(), requesterId, "RECIPIENT"))
+				.isInstanceOf(SonulimException.class)
+				.extracting(e -> ((SonulimException) e).getErrorCode())
+				.isEqualTo(ErrorCode.ROLE_MISMATCH);
+		verifyNoInteractions(linkAccessGuard, signalRepository);
 	}
 
 	private void doThrowOnGuard() {
