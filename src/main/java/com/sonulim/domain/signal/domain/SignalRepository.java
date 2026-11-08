@@ -20,6 +20,12 @@ public interface SignalRepository extends JpaRepository<Signal, UUID> {
 	boolean existsByLinkIdAndTemplateId(UUID linkId, UUID templateId);
 
 	/**
+	 * POST /signals의 Idempotency-Key 재시도 판별용 — 같은 연결·같은 키로 재시도하면
+	 * 새로 만들지 않고 이전에 만든 것을 그대로 돌려준다.
+	 */
+	Optional<Signal> findByLinkIdAndIdempotencyKey(UUID linkId, UUID idempotencyKey);
+
+	/**
 	 * 공통 데이터 형식: "이 연결의 다른 신호와 리듬이 완전히 같으면" 중복이다. excludeId를 주면
 	 * 그 신호 자신은 비교 대상에서 뺀다(수정 시 자기 자신 제외용, 생성/확인 시에는 null).
 	 */

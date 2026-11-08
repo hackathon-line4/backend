@@ -52,6 +52,22 @@ class RhythmBeatTest {
 	}
 
 	@Test
+	void reportsTheRhythmFieldWhenTheCountIsInvalid() {
+		assertThatThrownBy(() -> RhythmBeat.parseAll(List.of("SHORT")))
+				.isInstanceOf(SonulimException.class)
+				.extracting(e -> ((SonulimException) e).getField())
+				.isEqualTo("rhythm");
+	}
+
+	@Test
+	void reportsTheRhythmFieldWhenATokenIsUnknown() {
+		assertThatThrownBy(() -> RhythmBeat.parseAll(List.of("SHORT", "WRONG")))
+				.isInstanceOf(SonulimException.class)
+				.extracting(e -> ((SonulimException) e).getField())
+				.isEqualTo("rhythm");
+	}
+
+	@Test
 	void sumsBeatDurationsPlusGapsBetweenBeatsButNotAfterTheLastOne() {
 		long durationMs = RhythmBeat.totalDurationMs(List.of(RhythmBeat.SHORT, RhythmBeat.SHORT, RhythmBeat.LONG));
 

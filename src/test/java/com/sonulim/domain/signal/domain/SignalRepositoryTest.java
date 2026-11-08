@@ -106,6 +106,21 @@ class SignalRepositoryTest {
 	}
 
 	@Test
+	void findsASignalByLinkIdAndIdempotencyKey() {
+		UUID linkId = UUID.randomUUID();
+		UUID idempotencyKey = UUID.randomUUID();
+		Signal signal = Signal.createCustom(linkId, "가자", null, SignalCategory.OUTING, "icon",
+				List.of(RhythmBeat.SHORT, RhythmBeat.LONG));
+		signal.stampIdempotencyKey(idempotencyKey);
+		entityManager.persistAndFlush(signal);
+
+		var found = repository.findByLinkIdAndIdempotencyKey(linkId, idempotencyKey);
+
+		assertThat(found).contains(signal);
+		assertThat(repository.findByLinkIdAndIdempotencyKey(linkId, UUID.randomUUID())).isEmpty();
+	}
+
+	@Test
 	void findsNothingWhenNoRhythmMatches() {
 		UUID linkId = UUID.randomUUID();
 		entityManager.persistAndFlush(

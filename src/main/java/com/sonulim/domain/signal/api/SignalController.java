@@ -5,6 +5,7 @@ import java.util.UUID;
 
 import com.sonulim.domain.signal.application.SignalCommandService;
 import com.sonulim.domain.signal.application.SignalQueryService;
+import com.sonulim.domain.signal.domain.SignalCategory;
 import com.sonulim.global.exception.ApiResponse;
 import com.sonulim.global.security.AuthenticatedUser;
 import jakarta.validation.Valid;
@@ -17,7 +18,9 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -34,8 +37,9 @@ public class SignalController {
 
 	@GetMapping
 	public ApiResponse<SignalListResponse> list(@PathVariable UUID linkId,
+			@RequestParam(required = false) SignalCategory category,
 			@AuthenticationPrincipal AuthenticatedUser user) {
-		List<SignalResponse> signals = signalQueryService.list(linkId, user.userId(), user.role()).stream()
+		List<SignalResponse> signals = signalQueryService.list(linkId, user.userId(), user.role(), category).stream()
 				.map(SignalResponse::from)
 				.toList();
 		return ApiResponse.success(new SignalListResponse(signals));
@@ -51,8 +55,9 @@ public class SignalController {
 
 	@PostMapping
 	public ResponseEntity<ApiResponse<SignalResponse>> create(@PathVariable UUID linkId,
+			@RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey,
 			@Valid @RequestBody CreateSignalRequest request, @AuthenticationPrincipal AuthenticatedUser user) {
-		var signal = signalCommandService.create(linkId, user.userId(), user.role(), request.name(),
+		var signal = signalCommandService.create(linkId, user.userId(), user.role(), idempotencyKey, request.name(),
 				request.description(), request.category(), request.icon(), request.rhythm());
 		return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(SignalResponse.from(signal)));
 	}

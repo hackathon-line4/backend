@@ -17,6 +17,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 
 /**
  * link 도메인이 아직 없어서 Link 엔티티를 참조하지 않고 linkId만 평범한 컬럼으로 가진다(FK 없음).
@@ -24,7 +25,8 @@ import jakarta.persistence.Table;
  * ID는 account 도메인과 같은 관례(UUID, Hibernate 생성)를 따른다.
  */
 @Entity
-@Table(name = "signals")
+@Table(name = "signals", uniqueConstraints = @UniqueConstraint(name = "uk_signals_link_idempotency_key",
+		columnNames = {"link_id", "idempotency_key"}))
 public class Signal extends BaseEntity {
 
 	@Id
@@ -65,6 +67,9 @@ public class Signal extends BaseEntity {
 	@Column(name = "deleted_at")
 	private LocalDateTime deletedAt;
 
+	@Column(name = "idempotency_key")
+	private UUID idempotencyKey;
+
 	protected Signal() {
 	}
 
@@ -93,6 +98,14 @@ public class Signal extends BaseEntity {
 
 	public void softDelete() {
 		this.deletedAt = LocalDateTime.now(ZoneOffset.UTC);
+	}
+
+	/**
+	 * POST /signals의 Idempotency-Key 재시도 판별용. 생성 팩토리 메서드 시그니처를 건드리지
+	 * 않으려고 별도 메서드로 둔다 — 호출 측(SignalCommandService)만 이 값을 채운다.
+	 */
+	public void stampIdempotencyKey(UUID idempotencyKey) {
+		this.idempotencyKey = idempotencyKey;
 	}
 
 	public boolean isPracticed() {
@@ -185,5 +198,9 @@ public class Signal extends BaseEntity {
 
 	public LocalDateTime getDeletedAt() {
 		return deletedAt;
+	}
+
+	public UUID getIdempotencyKey() {
+		return idempotencyKey;
 	}
 }

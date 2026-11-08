@@ -1,10 +1,12 @@
 package com.sonulim.domain.signal.application;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
 import com.sonulim.domain.signal.domain.RhythmBeat;
 import com.sonulim.domain.signal.domain.Signal;
+import com.sonulim.domain.signal.domain.SignalCategory;
 import com.sonulim.domain.signal.domain.SignalRepository;
 import com.sonulim.global.exception.ErrorCode;
 import com.sonulim.global.exception.SonulimException;
@@ -22,10 +24,17 @@ public class SignalQueryService {
 		this.linkAccessGuard = linkAccessGuard;
 	}
 
-	public List<Signal> list(UUID linkId, UUID requesterId, String role) {
+	/**
+	 * 명세 정렬 규칙: 카테고리 순서(일상 → 외출 → 확인 → 긴급, SignalCategory 선언 순과 일치),
+	 * 그 안에서 만든 순(오래된 것부터). category를 주면 그 카테고리만 거른다.
+	 */
+	public List<Signal> list(UUID linkId, UUID requesterId, String role, SignalCategory category) {
 		GuardianOnly.require(role);
 		linkAccessGuard.verifyAccessible(linkId, requesterId);
-		return signalRepository.findByLinkIdAndDeletedAtIsNull(linkId);
+		return signalRepository.findByLinkIdAndDeletedAtIsNull(linkId).stream()
+				.filter(signal -> category == null || signal.getCategory() == category)
+				.sorted(Comparator.comparing(Signal::getCategory).thenComparing(Signal::getCreatedAt))
+				.toList();
 	}
 
 	/**

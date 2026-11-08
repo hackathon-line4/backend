@@ -1,6 +1,8 @@
 package com.sonulim.domain.signal.application;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 import com.sonulim.domain.signal.domain.RhythmBeat;
@@ -24,13 +26,24 @@ public class SignalCommandService {
 		this.linkAccessGuard = linkAccessGuard;
 	}
 
-	public Signal create(UUID linkId, UUID requesterId, String role, String name, String description,
-			SignalCategory category, String icon, List<String> rhythmTokens) {
+	/**
+	 * Idempotency-Key로 재시도하면(같은 연결·같은 키) 새로 만들지 않고 이전에 만든 신호를
+	 * 그대로 돌려준다. link 도메인(IdempotencyKeys)과 같은 패턴 — 공통 처리가 아직 없어서
+	 * signal 안에서 헤더를 직접 파싱한다.
+	 */
+	public Signal create(UUID linkId, UUID requesterId, String role, String idempotencyKeyHeader, String name,
+			String description, SignalCategory category, String icon, List<String> rhythmTokens) {
 		GuardianOnly.require(role);
+		UUID idempotencyKey = IdempotencyKeys.parse(idempotencyKeyHeader);
 		linkAccessGuard.verifyAccessible(linkId, requesterId);
+		Optional<Signal> alreadyCreated = signalRepository.findByLinkIdAndIdempotencyKey(linkId, idempotencyKey);
+		if (alreadyCreated.isPresent()) {
+			return alreadyCreated.get();
+		}
 		List<RhythmBeat> rhythm = RhythmBeat.parseAll(rhythmTokens);
 		ensureRhythmNotDuplicated(linkId, rhythm, null);
 		Signal signal = Signal.createCustom(linkId, name, description, category, icon, rhythm);
+		signal.stampIdempotencyKey(idempotencyKey);
 		return signalRepository.save(signal);
 	}
 
@@ -85,11 +98,14 @@ public class SignalCommandService {
 
 	/**
 	 * 공통 데이터 형식: "이 연결의 다른 신호와 리듬이 완전히 같으면" 안 된다. excludeSignalId는
-	 * 수정 시 자기 자신을 중복 검사에서 빼기 위한 것(생성 시에는 null).
+	 * 수정 시 자기 자신을 중복 검사에서 빼기 위한 것(생성 시에는 null). 명세 응답 형식대로
+	 * field=rhythm, details.conflictSignal={id,name}을 담는다.
 	 */
 	private void ensureRhythmNotDuplicated(UUID linkId, List<RhythmBeat> rhythm, UUID excludeSignalId) {
-		if (signalRepository.findByLinkIdAndRhythm(linkId, rhythm, excludeSignalId).isPresent()) {
-			throw new SonulimException(ErrorCode.RHYTHM_DUPLICATE, "같은 리듬의 신호가 이미 있어요");
-		}
+		signalRepository.findByLinkIdAndRhythm(linkId, rhythm, excludeSignalId).ifPresent(conflicting -> {
+			throw new SonulimException(ErrorCode.RHYTHM_DUPLICATE,
+					"'" + conflicting.getName() + "'와 같은 리듬이에요", "rhythm",
+					Map.of("conflictSignal", Map.of("id", conflicting.getId(), "name", conflicting.getName())));
+		});
 	}
 }
