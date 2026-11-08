@@ -22,6 +22,10 @@
 - 역할 선택 응답은 `{user, accessToken, refreshToken}` — 액세스 토큰에 역할이 담기므로 역할이 담긴 새 토큰을 바로 내려준다(팀 결정, 노션 명세 응답 갱신 대상). 같은 역할 재요청도 새 토큰을 발급하며 이전 갱신 토큰은 만료 전까지 유효
 - `GET /me`의 `links`는 빈 배열, `pendingLinkRequest`는 `null` — `link` 도메인 구현 후 채운다
 - Swagger: 인증이 필요한 API는 `@SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)`를 붙이면 Authorize 버튼으로 토큰을 넣어 호출할 수 있다
+- 다른 도메인이 사용자 이름·역할이 필요하면 `UserRepository` 대신 `UserQueryService`를 쓴다 (#47)
+  - `find(userId)` → `Optional<UserSummary>`, `findAll(userIds)` → `Map<UUID, UserSummary>`(목록은 한 번에 조회)
+  - `UserSummary(id, name, role)`만 내준다 — 이메일 등은 제외
+  - 없는 사용자는 빈 값으로 돌려준다. 404로 응답할지 등은 호출하는 쪽이 정한다(`MeService.getMe()`는 본인 조회라 401을 던지므로 다른 사용자 조회에 쓰지 않는다)
 
 ### 후속 작업 (해당 기능 구현 시)
 
