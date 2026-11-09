@@ -26,16 +26,21 @@
   - `find(userId)` → `Optional<UserSummary>`, `findAll(userIds)` → `Map<UUID, UserSummary>`(목록은 한 번에 조회)
   - `UserSummary(id, name, role)`만 내준다 — 이메일 등은 제외
   - 없는 사용자는 빈 값으로 돌려준다. 404로 응답할지 등은 호출하는 쪽이 정한다(`MeService.getMe()`는 본인 조회라 401을 던지므로 다른 사용자 조회에 쓰지 않는다)
+- 기기·푸시 토큰 등록 `PUT /api/v1/me/devices/{installationId}` (#8) — `devices` 테이블, `installation_id`가 기본 키
+  - upsert: 같은 `pushToken`을 가진 다른 기기 행 삭제, 이 사용자의 다른 기기 삭제(사용자당 1대, 임시값), 같은 설치에서 다른 계정으로 로그인하면 소유자 변경
+  - 정리용 삭제는 벌크 쿼리로 바로 실행 — Hibernate는 flush 때 insert를 delete보다 먼저 보내 `push_token` unique 제약에 걸리기 때문
+  - 로그아웃하면 요청한 `installationId`의 기기 삭제(내 기기일 때만)
+  - 당사자가 `GET /me`를 부르면 기기의 `last_seen_at` 갱신. 요청에 기기 정보가 없어 사용자의 기기 전체(MVP는 1대)를 갱신
 
 ### 후속 작업 (해당 기능 구현 시)
 
-- 로그아웃: `installationId`의 기기 등록 삭제, 이 사용자의 SSE 연결 종료 (기기 등록·실시간 구현 시)
-- `GET /me`: 당사자 호출 시 `devices.last_seen_at` 갱신 (기기 등록 구현 시)
+- 다른 도메인용 푸시 대상 조회·무효 토큰 삭제 메서드, FCM 발송 코드(`PushSender`) 위치·담당 — 팀 회의에서 정한 뒤 추가
+- 로그아웃: 이 사용자의 SSE 연결 종료 (실시간 구현 시)
 - 역할 선택: 보호자 알림 설정 기본값, 당사자 위치 공유 기본값 생성 (settings 구현 시)
 
 ## Pending Decisions
 
 - **비밀번호 찾기**: 이메일 재설정 링크 방식(부가 기능). — 기획 확인 필요.
-- **기기 수**: 사용자당 활성 기기 1대(MVP). — 프론트 확인 필요.
+- **기기 수**: 사용자당 활성 기기 1대(MVP). — 프론트 확인 필요. 현재 이 값으로 구현(`DeviceService.register`) — 바뀌면 이 사용자의 다른 기기를 지우는 줄만 고치면 된다.
 - 비밀번호 8자 이상 + 영문/숫자 포함, JWT 액세스 1시간 / 갱신 30일(회전 방식)은 `공통 규칙` 문서에 확정되어 있음 — 별도 협의 불필요.
 - 로그인 실패 제한(10분 안 5회 → 10분 잠금, 서버 메모리 저장)은 팀 확정 — 별도 협의 불필요.
