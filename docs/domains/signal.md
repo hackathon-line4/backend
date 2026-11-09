@@ -3,6 +3,12 @@
 **담당:** 하은별
 **범위:** 신호 목록/상세/추가/수정/삭제(M-1), 알려주기·연습(M-4), 같은 리듬 확인·추가(M-2, M-3), 리듬 프리셋·기본 신호 목록, 자주 쓰는 신호 지정(S-4, 예외로 이 도메인에 포함)
 
+## 구현 완료 (M-2, #55)
+
+- `GET /api/v1/signal-templates` — 검색(`q`, 이름·뜻 부분 일치)·카테고리 필터, `linkId`를 주면 그 연결 접근을 먼저 검증한 뒤 `alreadyAdded` 계산
+- `POST /api/v1/links/{linkId}/signals`에 `source: TEMPLATE` 추가 — 템플릿의 이름·뜻·카테고리·아이콘·리듬을 복사, 이미 추가됐으면 409 `TEMPLATE_ALREADY_ADDED`
+- `alreadyAdded`와 `TEMPLATE_ALREADY_ADDED`는 같은 기준(`existsByLinkIdAndTemplateIdAndDeletedAtIsNull`) — 삭제한 기본 신호는 둘 다 "추가 안 됨"으로 보고 재추가 가능. `DefaultSignalSeeder`(#49)가 쓰는 삭제-포함 기준(`existsByLinkIdAndTemplateId`)과는 의도적으로 다른 메서드다.
+
 ## 다른 도메인이 쓰는 계약
 
 - **`global.signalseed.DefaultSignalSeeder`**(#49) — `void seedDefaults(UUID linkId)`. 연결 승인 시 link 도메인이 호출하면, 이 연결에 `signal_templates` 카탈로그를 전부 Signal로 복사한다(`SignalTemplateSeeder`가 구현). `LinkAccessGuard`와 반대 방향(signal이 구현, link가 의존)으로 같은 패턴을 쓴다.

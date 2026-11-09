@@ -57,8 +57,8 @@ public class SignalController {
 	public ResponseEntity<ApiResponse<SignalResponse>> create(@PathVariable UUID linkId,
 			@RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey,
 			@Valid @RequestBody CreateSignalRequest request, @AuthenticationPrincipal AuthenticatedUser user) {
-		var signal = signalCommandService.create(linkId, user.userId(), user.role(), idempotencyKey, request.name(),
-				request.description(), request.category(), request.icon(), request.rhythm());
+		var signal = signalCommandService.create(linkId, user.userId(), user.role(), idempotencyKey,
+				request.toCommand());
 		return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(SignalResponse.from(signal)));
 	}
 

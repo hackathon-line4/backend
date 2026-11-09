@@ -7,8 +7,9 @@ import java.util.UUID;
 
 import com.sonulim.domain.signal.domain.RhythmBeat;
 import com.sonulim.domain.signal.domain.Signal;
-import com.sonulim.domain.signal.domain.SignalCategory;
 import com.sonulim.domain.signal.domain.SignalRepository;
+import com.sonulim.domain.signal.domain.SignalTemplate;
+import com.sonulim.domain.signal.domain.SignalTemplateRepository;
 import com.sonulim.global.exception.ErrorCode;
 import com.sonulim.global.exception.SonulimException;
 import com.sonulim.global.linkaccess.LinkAccessGuard;
@@ -19,20 +20,23 @@ import org.springframework.transaction.annotation.Transactional;
 public class SignalCommandService {
 
 	private final SignalRepository signalRepository;
+	private final SignalTemplateRepository signalTemplateRepository;
 	private final LinkAccessGuard linkAccessGuard;
 
-	public SignalCommandService(SignalRepository signalRepository, LinkAccessGuard linkAccessGuard) {
+	public SignalCommandService(SignalRepository signalRepository, SignalTemplateRepository signalTemplateRepository,
+			LinkAccessGuard linkAccessGuard) {
 		this.signalRepository = signalRepository;
+		this.signalTemplateRepository = signalTemplateRepository;
 		this.linkAccessGuard = linkAccessGuard;
 	}
 
 	/**
 	 * Idempotency-Key로 재시도하면(같은 연결·같은 키) 새로 만들지 않고 이전에 만든 신호를
 	 * 그대로 돌려준다. link 도메인(IdempotencyKeys)과 같은 패턴 — 공통 처리가 아직 없어서
-	 * signal 안에서 헤더를 직접 파싱한다.
+	 * signal 안에서 헤더를 직접 파싱한다. source로 CUSTOM(M-3)·TEMPLATE(M-2)를 가른다.
 	 */
-	public Signal create(UUID linkId, UUID requesterId, String role, String idempotencyKeyHeader, String name,
-			String description, SignalCategory category, String icon, List<String> rhythmTokens) {
+	public Signal create(UUID linkId, UUID requesterId, String role, String idempotencyKeyHeader,
+			CreateSignalCommand command) {
 		GuardianOnly.require(role);
 		UUID idempotencyKey = IdempotencyKeys.parse(idempotencyKeyHeader);
 		linkAccessGuard.verifyAccessible(linkId, requesterId);
@@ -40,11 +44,48 @@ public class SignalCommandService {
 		if (alreadyCreated.isPresent()) {
 			return alreadyCreated.get();
 		}
-		List<RhythmBeat> rhythm = RhythmBeat.parseAll(rhythmTokens);
-		ensureRhythmNotDuplicated(linkId, rhythm, null);
-		Signal signal = Signal.createCustom(linkId, name, description, category, icon, rhythm);
+
+		Signal signal = switch (command.source()) {
+			case CUSTOM -> createCustom(linkId, command);
+			case TEMPLATE -> createFromTemplate(linkId, command);
+		};
 		signal.stampIdempotencyKey(idempotencyKey);
 		return signalRepository.save(signal);
+	}
+
+	/**
+	 * M-3: name·category·rhythm은 요청 DTO에서 조건부 필수(TEMPLATE일 땐 안 보냄)라 bean
+	 * validation으로 표현할 수 없어 여기서 직접 검증한다.
+	 */
+	private Signal createCustom(UUID linkId, CreateSignalCommand command) {
+		if (command.name() == null || command.name().isBlank()) {
+			throw SonulimException.forField(ErrorCode.VALIDATION_FAILED, "이름을 입력해 주세요", "name");
+		}
+		if (command.category() == null) {
+			throw SonulimException.forField(ErrorCode.VALIDATION_FAILED, "카테고리를 선택해 주세요", "category");
+		}
+		List<RhythmBeat> rhythm = RhythmBeat.parseAll(command.rhythm());
+		ensureRhythmNotDuplicated(linkId, rhythm, null);
+		return Signal.createCustom(linkId, command.name(), command.description(), command.category(),
+				command.icon(), rhythm);
+	}
+
+	/**
+	 * M-2: 기본 신호의 이름·뜻·카테고리·아이콘·리듬을 그대로 복사한다. 삭제한 기본 신호는
+	 * 다시 추가할 수 있다는 명세대로, "이미 추가됨" 판정은 삭제 안 된 것만 센다.
+	 */
+	private Signal createFromTemplate(UUID linkId, CreateSignalCommand command) {
+		if (command.templateId() == null) {
+			throw SonulimException.forField(ErrorCode.VALIDATION_FAILED, "기본 신호를 선택해 주세요", "templateId");
+		}
+		SignalTemplate template = signalTemplateRepository.findById(command.templateId())
+				.orElseThrow(() -> new SonulimException(ErrorCode.NOT_FOUND, "신호를 찾을 수 없어요"));
+		if (signalRepository.existsByLinkIdAndTemplateIdAndDeletedAtIsNull(linkId, command.templateId())) {
+			throw new SonulimException(ErrorCode.TEMPLATE_ALREADY_ADDED, "이미 추가한 신호예요");
+		}
+		ensureRhythmNotDuplicated(linkId, template.getRhythm(), null);
+		return Signal.fromTemplate(linkId, command.templateId(), template.getName(), template.getDescription(),
+				template.getCategory(), template.getIcon(), template.getRhythm());
 	}
 
 	@Transactional

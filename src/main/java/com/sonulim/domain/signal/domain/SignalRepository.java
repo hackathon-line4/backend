@@ -20,6 +20,13 @@ public interface SignalRepository extends JpaRepository<Signal, UUID> {
 	boolean existsByLinkIdAndTemplateId(UUID linkId, UUID templateId);
 
 	/**
+	 * M-2 기본 신호 추가·목록의 alreadyAdded 기준 — "삭제한 기본 신호는 다시 추가할 수 있다"는
+	 * 명세대로 삭제된 것은 세지 않는다. DefaultSignalSeeder가 쓰는 existsByLinkIdAndTemplateId
+	 * (삭제 포함)와는 의도적으로 다른 메서드다 — 혼동해서 바꿔 쓰지 않는다.
+	 */
+	boolean existsByLinkIdAndTemplateIdAndDeletedAtIsNull(UUID linkId, UUID templateId);
+
+	/**
 	 * POST /signals의 Idempotency-Key 재시도 판별용 — 같은 연결·같은 키로 재시도하면
 	 * 새로 만들지 않고 이전에 만든 것을 그대로 돌려준다.
 	 */
