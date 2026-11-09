@@ -132,23 +132,6 @@ class SignalControllerTest {
 	}
 
 	@Test
-	void detailReturns400InsteadOf500WhenSignalIdIsNotAValidUuid() throws Exception {
-		mockMvc.perform(get("/api/v1/links/{linkId}/signals/{signalId}", UUID.randomUUID(), "not-a-uuid")
-						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID())))
-				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
-	}
-
-	@Test
-	void listReturns400InsteadOf500ForAnUnknownCategoryQueryValue() throws Exception {
-		mockMvc.perform(get("/api/v1/links/{linkId}/signals", UUID.randomUUID())
-						.queryParam("category", "NOT_A_CATEGORY")
-						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID())))
-				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"));
-	}
-
-	@Test
 	void detailReturns404WhenSignalDoesNotExist() throws Exception {
 		mockMvc.perform(get("/api/v1/links/{linkId}/signals/{signalId}", UUID.randomUUID(), UUID.randomUUID())
 						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID())))

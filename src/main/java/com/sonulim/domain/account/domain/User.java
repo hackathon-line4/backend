@@ -1,5 +1,6 @@
 package com.sonulim.domain.account.domain;
 
+import java.time.LocalDateTime;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -13,6 +14,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 import com.sonulim.global.BaseEntity;
+import com.sonulim.global.exception.ErrorCode;
+import com.sonulim.global.exception.SonulimException;
 
 // PostgreSQL에서 user는 예약어라 테이블 이름을 users로 둔다.
 @Entity
@@ -37,6 +40,8 @@ public class User extends BaseEntity {
 	@Column(length = 20)
 	private Role role;
 
+	private LocalDateTime roleSetAt;
+
 	protected User() {
 	}
 
@@ -57,6 +62,20 @@ public class User extends BaseEntity {
 		return email.trim().toLowerCase(Locale.ROOT);
 	}
 
+	/**
+	 * MVP에서는 역할을 바꿀 수 없다. 같은 역할을 다시 고르면 그대로 두고(재시도 안전), 다른 역할이면 거부한다.
+	 */
+	public void selectRole(Role role, LocalDateTime now) {
+		if (this.role == role) {
+			return;
+		}
+		if (this.role != null) {
+			throw new SonulimException(ErrorCode.ROLE_ALREADY_SET, "이미 역할을 선택했어요");
+		}
+		this.role = role;
+		this.roleSetAt = now;
+	}
+
 	public UUID getId() {
 		return id;
 	}
@@ -75,5 +94,9 @@ public class User extends BaseEntity {
 
 	public Role getRole() {
 		return role;
+	}
+
+	public LocalDateTime getRoleSetAt() {
+		return roleSetAt;
 	}
 }

@@ -31,7 +31,7 @@ class AuthenticationFilterIntegrationTest {
 
 	private static final String PROTECTED_PATH = "/api/v1/test/protected";
 
-	// 인증 필터 동작만 확인하기 위한 보호 경로. 이번 범위에는 인증이 필요한 실제 API가 없다.
+	// 도메인 API와 관계없이 인증 필터 동작만 확인하기 위한 보호 경로
 	@RestController
 	static class ProtectedTestController {
 
