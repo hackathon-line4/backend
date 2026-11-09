@@ -71,6 +71,14 @@ class GlobalExceptionHandlerTest {
 				.andExpect(jsonPath("$.error.field").value("category"));
 	}
 
+	@Test
+	void missingRequiredQueryParamMapsTo400InsteadOf500() throws Exception {
+		mockMvc.perform(get("/test/requires-link-id"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.error.field").value("linkId"));
+	}
+
 	@RestController
 	static class TestController {
 
@@ -95,6 +103,10 @@ class GlobalExceptionHandlerTest {
 		@GetMapping("/test/by-category")
 		void byCategory(
 				@org.springframework.web.bind.annotation.RequestParam(required = false) TestCategory category) {
+		}
+
+		@GetMapping("/test/requires-link-id")
+		void requiresLinkId(@org.springframework.web.bind.annotation.RequestParam java.util.UUID linkId) {
 		}
 
 		record TestRequest(@NotBlank(message = "이메일 형식이 아니에요") String email) {
