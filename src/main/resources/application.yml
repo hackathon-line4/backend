@@ -21,3 +21,8 @@ sonulim:
     refresh-expiration-seconds: ${JWT_REFRESH_EXPIRATION_SECONDS:2592000}
   firebase:
     credentials-path: ${FIREBASE_CREDENTIALS_PATH:}
+  idempotency:
+    # 공통 규칙에 24시간으로 확정되어 있다.
+    retention: 24h
+    # 기한이 지난 기록을 지우는 주기(ms). 기본 1시간.
+    cleanup-interval-ms: 3600000
