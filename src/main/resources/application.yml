@@ -21,3 +21,11 @@ sonulim:
     refresh-expiration-seconds: ${JWT_REFRESH_EXPIRATION_SECONDS:2592000}
   firebase:
     credentials-path: ${FIREBASE_CREDENTIALS_PATH:}
+  messaging:
+    # 긴급 신호 전달 후 이만큼 무응답이면 보호자에게 경고. 백엔드 제안값이고 기획 확정 전이다
+    # (docs/domains/messaging.md의 Pending Decisions).
+    emergency-warning-delay: 30s
+    # 보호자가 고른 값(5/10/30분)을 써야 하지만 settings 도메인 구현 전까지 이 기본값을 쓴다.
+    default-response-wait-minutes: 10
+    # 기한이 지난 기록을 훑는 주기(ms) = 판정이 늦어질 수 있는 최대 시간.
+    timer-sweep-interval-ms: 5000

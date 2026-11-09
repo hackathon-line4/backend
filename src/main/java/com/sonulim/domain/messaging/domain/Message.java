@@ -21,6 +21,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -44,6 +45,13 @@ public class Message extends BaseEntity {
 	@Id
 	@GeneratedValue(strategy = GenerationType.UUID)
 	private UUID id;
+
+	/**
+	 * 판정 타이머와 당사자의 터치가 동시에 들어올 수 있다(서버 내부 처리). 둘 중 하나만 이기도록 낙관적 락을 건다 —
+	 * 진 쪽은 OptimisticLockException으로 끝나고, 타이머는 그 건을 건너뛴다.
+	 */
+	@Version
+	private long version;
 
 	@Column(nullable = false)
 	private UUID linkId;
@@ -321,6 +329,10 @@ public class Message extends BaseEntity {
 
 	public UUID getId() {
 		return id;
+	}
+
+	public long getVersion() {
+		return version;
 	}
 
 	public UUID getLinkId() {

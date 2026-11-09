@@ -20,12 +20,22 @@
   - step 9개: `SENT` `FAILED` `DELIVERED` `UNCONFIRMED` `PLAYED` `RESPONDED` `NO_RESPONSE` `WAIT_EXTENDED` `EMERGENCY_WARNING`
   - `PLAYED`는 줄을 하나만 두고 `meta.count`만 갱신한다(명세: "처음 보고 때 PLAYED를 남기고 이후에는 횟수만 갱신")
 - ack 판정 시간·응답 대기 시간은 아직 확정되지 않아 상수로 박지 않고 메서드 파라미터로 받는다
+- 서버 타이머 3종 (#20): ack 판정 → `UNCONFIRMED`, 대기 만료 → `NO_RESPONSE`, 긴급 전달 후 무응답 → `emergencyWarning`
+  - 기한(`ackDeadline`·`waitUntil`)을 DB 컬럼으로 들고 있어 **서버가 재시작해도 판정이 사라지지 않는다**. 짧은 주기(`sonulim.messaging.timer-sweep-interval-ms`, 기본 5초) 스케줄러가 지난 건을 훑는다
+  - 판정과 터치 응답의 경합은 **낙관적 락(`@Version`)**으로 푼다. 벌크 UPDATE가 아니라 엔티티를 거치는 이유는 판정도 타임라인에 남아야 하기 때문이다 — 진 쪽은 `ObjectOptimisticLockingFailureException`으로 끝나고 타이머가 그 건을 건너뛴다. 늦게 도착한 터치가 판정에 덮이지 않는다
+  - 판정은 건별 트랜잭션이라 한 건이 실패해도 나머지가 함께 말리지 않는다
+  - `@Scheduled`의 `fixedDelayString`은 `5s` 같은 표기를 못 읽는다(밀리초 또는 ISO-8601만). 그래서 주기만 ms 숫자로 두고, 미확정 **업무** 값인 긴급 경고 지연은 `MessagingProperties`에 Duration으로 둔다
+- 당사자 수신 보고 3종 (#22): `POST /messages/{id}/ack` · `/playback` · `/response`. 당사자(받는 사람)만 호출
+  - 역할이 다르면 403 `ROLE_MISMATCH`, 역할 선택 전이면 403 `ROLE_REQUIRED`, **내 기록이 아니면 404** — 남의 기록이 존재한다는 사실 자체를 숨긴다(공통 규칙의 연결 범위)
+  - 셋 다 재시도에 안전하다. 당사자 앱이 실패 시 자동으로 다시 보내기 때문에 같은 요청이 여러 번 와도 결과가 달라지지 않는다
+  - 응답 대기 시간은 보호자가 고른 값(`notification_settings`)을 써야 하지만, settings 도메인 구현 전까지 `sonulim.messaging.default-response-wait-minutes`를 쓴다
+  - 값이 없는 필드는 빼지 않고 `null`로 둔다(공통 규칙). 테스트에서 `jsonPath(...).doesNotExist()`는 "없음"과 "null"을 **둘 다 통과시키므로** 키 존재를 `hasKey`로 따로 확인한다
+- 타임라인은 `LAZY`다. 목록 조회에서 N+1이 나지 않게 유지하고, 기록 상세는 fetch join으로 가져온다 — 트랜잭션 밖에서 `getTimeline()`을 읽으면 터진다
 
 ### 후속 작업 (해당 기능 구현 시)
 
-- 서버 타이머(ack 판정 → `UNCONFIRMED`, 대기 만료 → `NO_RESPONSE`, 긴급 30초 → `emergencyWarning`). `ackDeadline`·`waitUntil`을 컬럼으로 들고 있어 서버가 재시작해도 살아남는다
-- `MessageRepository`와 조건부 UPDATE — 판정과 응답이 동시에 들어올 수 있다(서버 내부 처리 문서)
 - `canResend`: 원래 신호가 삭제되지 않았는지 — `signal` 도메인 구현 후
+- 응답에 사용자 이름이 필요한 3개(`extend-wait`·`incoming`·`detail`) — `messages`에는 UUID만 있어 `account`에서 이름을 읽어 와야 한다. `MeService.getMe()`는 사용자가 없으면 401을 던져 제3자 조회용으로는 의미가 맞지 않으므로, account에 읽기 전용 조회를 추가하고 담당자(최용주)를 리뷰어로 지정한다
 - 신호 보내기·다시 보내기의 연결 구성원 검증(아니면 403이 아니라 404) — `link` 도메인 구현 후
 - 응답 대기 시간을 보호자의 `notification_settings.response_wait_minutes`에서 읽기 — `settings` 구현 후
 - `message.created`/`message.updated` 이벤트 발행과 푸시 — 실시간·푸시 구현 후
