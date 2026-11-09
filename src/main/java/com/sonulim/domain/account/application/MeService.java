@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,13 +20,15 @@ public class MeService {
 	private final UserRepository userRepository;
 	private final TokenService tokenService;
 	private final DeviceService deviceService;
+	private final ApplicationEventPublisher eventPublisher;
 	private final Clock clock;
 
 	public MeService(UserRepository userRepository, TokenService tokenService, DeviceService deviceService,
-			Clock clock) {
+			ApplicationEventPublisher eventPublisher, Clock clock) {
 		this.userRepository = userRepository;
 		this.tokenService = tokenService;
 		this.deviceService = deviceService;
+		this.eventPublisher = eventPublisher;
 		this.clock = clock;
 	}
 
@@ -46,6 +49,7 @@ public class MeService {
 	public AuthResult selectRole(UUID userId, Role role) {
 		User user = findUser(userId);
 		user.selectRole(role, LocalDateTime.now(clock));
+		eventPublisher.publishEvent(new RoleSelectedEvent(user.getId(), user.getRole()));
 		return AuthResult.of(tokenService.issue(user), user);
 	}
 
