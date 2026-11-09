@@ -3,6 +3,7 @@ package com.sonulim.domain.account.application;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -24,16 +25,18 @@ public class AuthService {
 	private final UserAgreementRepository userAgreementRepository;
 	private final PasswordEncoder passwordEncoder;
 	private final TokenService tokenService;
+	private final DeviceService deviceService;
 	private final LoginAttemptLimiter loginAttemptLimiter;
 	private final Clock clock;
 
 	public AuthService(UserRepository userRepository, UserAgreementRepository userAgreementRepository,
-			PasswordEncoder passwordEncoder, TokenService tokenService, LoginAttemptLimiter loginAttemptLimiter,
-			Clock clock) {
+			PasswordEncoder passwordEncoder, TokenService tokenService, DeviceService deviceService,
+			LoginAttemptLimiter loginAttemptLimiter, Clock clock) {
 		this.userRepository = userRepository;
 		this.userAgreementRepository = userAgreementRepository;
 		this.passwordEncoder = passwordEncoder;
 		this.tokenService = tokenService;
+		this.deviceService = deviceService;
 		this.loginAttemptLimiter = loginAttemptLimiter;
 		this.clock = clock;
 	}
@@ -82,6 +85,15 @@ public class AuthService {
 
 		loginAttemptLimiter.recordSuccess(email);
 		return AuthResult.of(tokenService.issue(user), user);
+	}
+
+	/**
+	 * 갱신 토큰을 무효화하고 이 기기의 푸시 등록을 지운다. 당사자가 로그아웃하면 이후 보호자 신호는 기기 없음으로 실패한다.
+	 */
+	@Transactional
+	public void logout(UUID userId, String refreshToken, String installationId) {
+		tokenService.revoke(userId, refreshToken);
+		deviceService.unregister(userId, installationId);
 	}
 
 	private static SonulimException emailAlreadyExists() {
