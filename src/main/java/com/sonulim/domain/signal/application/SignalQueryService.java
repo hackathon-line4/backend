@@ -67,8 +67,9 @@ public class SignalQueryService {
 		GuardianOnly.require(role);
 		linkAccessGuard.verifyAccessible(linkId, requesterId);
 		List<RhythmBeat> rhythm = RhythmBeat.parseAll(rhythmTokens);
-		long durationMs = RhythmBeat.totalDurationMs(rhythm);
-		return signalRepository.findByLinkIdAndRhythm(linkId, rhythm, excludeSignalId)
+		List<Integer> pulses = RhythmBeat.toPulses(rhythm);
+		long durationMs = pulses.stream().mapToLong(Integer::longValue).sum();
+		return signalRepository.findByLinkIdAndPulses(linkId, pulses, excludeSignalId)
 				.map(conflicting -> new RhythmCheckResult(false, durationMs,
 						new RhythmCheckResult.ConflictSignal(conflicting.getId(), conflicting.getName())))
 				.orElseGet(() -> new RhythmCheckResult(true, durationMs, null));

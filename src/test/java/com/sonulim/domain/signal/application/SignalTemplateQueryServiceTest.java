@@ -41,7 +41,8 @@ class SignalTemplateQueryServiceTest {
 	}
 
 	private SignalTemplate template(String name, String description, SignalCategory category) {
-		return new SignalTemplate(name, description, category, "icon", List.of(RhythmBeat.SHORT, RhythmBeat.LONG));
+		return new SignalTemplate(name, description, category, "icon", List.of(RhythmBeat.SHORT, RhythmBeat.LONG),
+				RhythmBeat.toPulses(List.of(RhythmBeat.SHORT, RhythmBeat.LONG)));
 	}
 
 	@Test

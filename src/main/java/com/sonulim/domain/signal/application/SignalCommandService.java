@@ -72,23 +72,24 @@ public class SignalCommandService {
 		if (command.presetId() != null) {
 			ensurePresetNotInUse(linkId, command.presetId());
 		}
-		ensureRhythmNotDuplicated(linkId, rhythm, null);
+		ensurePulsesNotDuplicated(linkId, RhythmBeat.toPulses(rhythm), null);
 		return Signal.createCustom(linkId, command.name(), command.description(), command.category(),
 				command.icon(), rhythm);
 	}
 
 	/**
 	 * usedBy(GET /rhythm-presets)와 동일한 "이미 사용 중" 판정 기준을 쓴다 — 둘 다
-	 * SignalRepository.findByLinkIdAndRhythm로 리듬이 겹치는 신호가 있는지를 본다.
+	 * SignalRepository.findByLinkIdAndPulses로 진동(pulses)이 겹치는 신호가 있는지를 본다.
 	 */
 	private void ensurePresetNotInUse(UUID linkId, UUID presetId) {
 		RhythmPreset preset = rhythmPresetRepository.findById(presetId)
 				.orElseThrow(() -> new SonulimException(ErrorCode.NOT_FOUND, "리듬 프리셋을 찾을 수 없어요"));
-		signalRepository.findByLinkIdAndRhythm(linkId, preset.getRhythm(), null).ifPresent(conflicting -> {
-			throw new SonulimException(ErrorCode.PRESET_IN_USE,
-					"'" + conflicting.getName() + "' 신호가 쓰는 리듬이에요", "presetId",
-					Map.of("conflictSignal", Map.of("id", conflicting.getId(), "name", conflicting.getName())));
-		});
+		signalRepository.findByLinkIdAndPulses(linkId, RhythmBeat.toPulses(preset.getRhythm()), null)
+				.ifPresent(conflicting -> {
+					throw new SonulimException(ErrorCode.PRESET_IN_USE,
+							"'" + conflicting.getName() + "' 신호가 쓰는 리듬이에요", "presetId",
+							Map.of("conflictSignal", Map.of("id", conflicting.getId(), "name", conflicting.getName())));
+				});
 	}
 
 	/**
@@ -104,9 +105,9 @@ public class SignalCommandService {
 		if (signalRepository.existsByLinkIdAndTemplateIdAndDeletedAtIsNull(linkId, command.templateId())) {
 			throw new SonulimException(ErrorCode.TEMPLATE_ALREADY_ADDED, "이미 추가한 신호예요");
 		}
-		ensureRhythmNotDuplicated(linkId, template.getRhythm(), null);
+		ensurePulsesNotDuplicated(linkId, template.getPulses(), null);
 		return Signal.fromTemplate(linkId, command.templateId(), template.getName(), template.getDescription(),
-				template.getCategory(), template.getIcon(), template.getRhythm());
+				template.getCategory(), template.getIcon(), template.getRhythm(), template.getPulses());
 	}
 
 	@Transactional
@@ -116,7 +117,7 @@ public class SignalCommandService {
 
 		if (command.rhythm() != null) {
 			List<RhythmBeat> rhythm = RhythmBeat.parseAll(command.rhythm());
-			ensureRhythmNotDuplicated(signal.getLinkId(), rhythm, signal.getId());
+			ensurePulsesNotDuplicated(signal.getLinkId(), RhythmBeat.toPulses(rhythm), signal.getId());
 			signal.updateRhythm(rhythm);
 		}
 		if (command.name() != null) {
@@ -159,12 +160,13 @@ public class SignalCommandService {
 	}
 
 	/**
-	 * 공통 데이터 형식: "이 연결의 다른 신호와 리듬이 완전히 같으면" 안 된다. excludeSignalId는
-	 * 수정 시 자기 자신을 중복 검사에서 빼기 위한 것(생성 시에는 null). 명세 응답 형식대로
-	 * field=rhythm, details.conflictSignal={id,name}을 담는다.
+	 * 공통 데이터 형식: "이 연결의 다른 신호와 진동(pulses)이 완전히 같으면" 안 된다. rhythm이
+	 * 아니라 pulses로 비교해야 CUSTOM과 TEMPLATE(rhythm이 null일 수 있음)을 같은 기준으로
+	 * 비교할 수 있다. excludeSignalId는 수정 시 자기 자신을 중복 검사에서 빼기 위한 것(생성
+	 * 시에는 null). 명세 응답 형식대로 field=rhythm, details.conflictSignal={id,name}을 담는다.
 	 */
-	private void ensureRhythmNotDuplicated(UUID linkId, List<RhythmBeat> rhythm, UUID excludeSignalId) {
-		signalRepository.findByLinkIdAndRhythm(linkId, rhythm, excludeSignalId).ifPresent(conflicting -> {
+	private void ensurePulsesNotDuplicated(UUID linkId, List<Integer> pulses, UUID excludeSignalId) {
+		signalRepository.findByLinkIdAndPulses(linkId, pulses, excludeSignalId).ifPresent(conflicting -> {
 			throw new SonulimException(ErrorCode.RHYTHM_DUPLICATE,
 					"'" + conflicting.getName() + "'와 같은 리듬이에요", "rhythm",
 					Map.of("conflictSignal", Map.of("id", conflicting.getId(), "name", conflicting.getName())));

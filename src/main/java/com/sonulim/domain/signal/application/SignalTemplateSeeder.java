@@ -39,20 +39,21 @@ public class SignalTemplateSeeder implements DefaultSignalSeeder {
 			if (signalRepository.existsByLinkIdAndTemplateId(linkId, template.getId())) {
 				continue;
 			}
-			ensureRhythmNotDuplicated(linkId, template);
+			ensurePulsesNotDuplicated(linkId, template);
 			Signal signal = Signal.fromTemplate(linkId, template.getId(), template.getName(),
-					template.getDescription(), template.getCategory(), template.getIcon(), template.getRhythm());
+					template.getDescription(), template.getCategory(), template.getIcon(), template.getRhythm(),
+					template.getPulses());
 			signalRepository.save(signal);
 		}
 	}
 
 	/**
-	 * SignalCommandService.ensureRhythmNotDuplicated와 같은 규칙: 이 연결에 같은 리듬이
+	 * SignalCommandService.ensurePulsesNotDuplicated와 같은 규칙: 이 연결에 같은 진동(pulses)이
 	 * 이미 있으면 안 된다. 여러 템플릿을 한 번에 넣는 도중 충돌이 나면 트랜잭션 전체를
 	 * 롤백해서 일부만 만들어진 상태가 되지 않게 한다.
 	 */
-	private void ensureRhythmNotDuplicated(UUID linkId, SignalTemplate template) {
-		if (signalRepository.findByLinkIdAndRhythm(linkId, template.getRhythm(), null).isPresent()) {
+	private void ensurePulsesNotDuplicated(UUID linkId, SignalTemplate template) {
+		if (signalRepository.findByLinkIdAndPulses(linkId, template.getPulses(), null).isPresent()) {
 			throw new SonulimException(ErrorCode.RHYTHM_DUPLICATE, "같은 리듬의 신호가 이미 있어요");
 		}
 	}

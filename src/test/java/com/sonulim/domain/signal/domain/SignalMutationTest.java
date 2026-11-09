@@ -35,7 +35,8 @@ class SignalMutationTest {
 	@Test
 	void templateSignalRejectsNameChange() {
 		Signal signal = Signal.fromTemplate(linkId, UUID.randomUUID(), "기본 신호", null,
-				SignalCategory.CHECK, "icon", List.of(RhythmBeat.SHORT, RhythmBeat.LONG));
+				SignalCategory.CHECK, "icon", List.of(RhythmBeat.SHORT, RhythmBeat.LONG),
+				RhythmBeat.toPulses(List.of(RhythmBeat.SHORT, RhythmBeat.LONG)));
 
 		assertThatThrownBy(() -> signal.updateName("바꾼 이름"))
 				.isInstanceOf(SonulimException.class)
@@ -46,7 +47,8 @@ class SignalMutationTest {
 	@Test
 	void templateSignalRejectsRhythmChange() {
 		Signal signal = Signal.fromTemplate(linkId, UUID.randomUUID(), "기본 신호", null,
-				SignalCategory.CHECK, "icon", List.of(RhythmBeat.SHORT, RhythmBeat.LONG));
+				SignalCategory.CHECK, "icon", List.of(RhythmBeat.SHORT, RhythmBeat.LONG),
+				RhythmBeat.toPulses(List.of(RhythmBeat.SHORT, RhythmBeat.LONG)));
 
 		assertThatThrownBy(() -> signal.updateRhythm(List.of(RhythmBeat.LONG, RhythmBeat.LONG)))
 				.isInstanceOf(SonulimException.class)
@@ -68,7 +70,8 @@ class SignalMutationTest {
 	@Test
 	void templateSignalStillAllowsDescriptionCategoryAndIconChanges() {
 		Signal signal = Signal.fromTemplate(linkId, UUID.randomUUID(), "기본 신호", null,
-				SignalCategory.CHECK, "icon", List.of(RhythmBeat.SHORT, RhythmBeat.LONG));
+				SignalCategory.CHECK, "icon", List.of(RhythmBeat.SHORT, RhythmBeat.LONG),
+				RhythmBeat.toPulses(List.of(RhythmBeat.SHORT, RhythmBeat.LONG)));
 
 		signal.updateDescription("새 설명");
 		signal.updateCategory(SignalCategory.EMERGENCY);

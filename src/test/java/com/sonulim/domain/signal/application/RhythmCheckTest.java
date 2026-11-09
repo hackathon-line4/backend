@@ -45,7 +45,7 @@ class RhythmCheckTest {
 
 		verify(linkAccessGuard).verifyAccessible(linkId, requesterId);
 		assertThat(result.valid()).isTrue();
-		assertThat(result.durationMs()).isEqualTo(1400);
+		assertThat(result.durationMs()).isEqualTo(1300);
 		assertThat(result.conflictSignal()).isNull();
 	}
 
@@ -53,14 +53,14 @@ class RhythmCheckTest {
 	void reportsInvalidWithTheConflictingSignal() {
 		Signal existing = Signal.createCustom(linkId, "가자", null, SignalCategory.OUTING, "icon",
 				List.of(RhythmBeat.SHORT, RhythmBeat.LONG));
-		given(signalRepository.findByLinkIdAndRhythm(linkId, List.of(RhythmBeat.SHORT, RhythmBeat.LONG), null))
+		given(signalRepository.findByLinkIdAndPulses(linkId, RhythmBeat.toPulses(List.of(RhythmBeat.SHORT, RhythmBeat.LONG)), null))
 				.willReturn(Optional.of(existing));
 
 		RhythmCheckResult result = service().checkRhythm(linkId, requesterId, "GUARDIAN", List.of("SHORT", "LONG"),
 				null);
 
 		assertThat(result.valid()).isFalse();
-		assertThat(result.durationMs()).isEqualTo(1400);
+		assertThat(result.durationMs()).isEqualTo(1300);
 		assertThat(result.conflictSignal().name()).isEqualTo("가자");
 	}
 
@@ -70,7 +70,7 @@ class RhythmCheckTest {
 
 		service().checkRhythm(linkId, requesterId, "GUARDIAN", List.of("SHORT", "LONG"), excludeSignalId);
 
-		verify(signalRepository).findByLinkIdAndRhythm(linkId, List.of(RhythmBeat.SHORT, RhythmBeat.LONG),
+		verify(signalRepository).findByLinkIdAndPulses(linkId, RhythmBeat.toPulses(List.of(RhythmBeat.SHORT, RhythmBeat.LONG)),
 				excludeSignalId);
 	}
 

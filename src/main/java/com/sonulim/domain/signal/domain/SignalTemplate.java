@@ -37,19 +37,27 @@ public class SignalTemplate {
 	private String icon;
 
 	@Convert(converter = RhythmListConverter.class)
-	@Column(nullable = false)
 	private List<RhythmBeat> rhythm;
+
+	@Convert(converter = PulseListConverter.class)
+	@Column(nullable = false)
+	private List<Integer> pulses;
 
 	protected SignalTemplate() {
 	}
 
+	/**
+	 * 기본 신호는 쉼이 불규칙(150/500/50ms 등)해서 SHORT/MEDIUM/LONG으로 못 담는 경우가 있다
+	 * (촉신호 -> 진동 변환 규칙 문서) — rhythm은 null일 수 있고, pulses는 항상 실제 값을 그대로 쓴다.
+	 */
 	public SignalTemplate(String name, String description, SignalCategory category, String icon,
-			List<RhythmBeat> rhythm) {
+			List<RhythmBeat> rhythm, List<Integer> pulses) {
 		this.name = name;
 		this.description = description;
 		this.category = category;
 		this.icon = icon;
-		this.rhythm = List.copyOf(rhythm);
+		this.rhythm = rhythm == null ? null : List.copyOf(rhythm);
+		this.pulses = List.copyOf(pulses);
 	}
 
 	public UUID getId() {
@@ -74,5 +82,9 @@ public class SignalTemplate {
 
 	public List<RhythmBeat> getRhythm() {
 		return rhythm;
+	}
+
+	public List<Integer> getPulses() {
+		return pulses;
 	}
 }

@@ -33,13 +33,15 @@ public interface SignalRepository extends JpaRepository<Signal, UUID> {
 	Optional<Signal> findByLinkIdAndIdempotencyKey(UUID linkId, UUID idempotencyKey);
 
 	/**
-	 * 공통 데이터 형식: "이 연결의 다른 신호와 리듬이 완전히 같으면" 중복이다. excludeId를 주면
-	 * 그 신호 자신은 비교 대상에서 뺀다(수정 시 자기 자신 제외용, 생성/확인 시에는 null).
+	 * 공통 데이터 형식: "이 연결의 다른 신호와 진동(pulses)이 완전히 같으면" 중복이다. rhythm이
+	 * 아니라 pulses로 비교해야 CUSTOM(rhythm에서 계산)과 TEMPLATE(rhythm이 null일 수 있음)을
+	 * 같은 기준으로 비교할 수 있다. excludeId를 주면 그 신호 자신은 비교 대상에서 뺀다(수정 시
+	 * 자기 자신 제외용, 생성/확인 시에는 null).
 	 */
-	default Optional<Signal> findByLinkIdAndRhythm(UUID linkId, List<RhythmBeat> rhythm, UUID excludeId) {
+	default Optional<Signal> findByLinkIdAndPulses(UUID linkId, List<Integer> pulses, UUID excludeId) {
 		return findByLinkIdAndDeletedAtIsNull(linkId).stream()
 				.filter(signal -> excludeId == null || !signal.getId().equals(excludeId))
-				.filter(signal -> signal.getRhythm().equals(rhythm))
+				.filter(signal -> signal.getPulses().equals(pulses))
 				.findFirst();
 	}
 }

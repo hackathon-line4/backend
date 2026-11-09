@@ -71,6 +71,22 @@ class RhythmBeatTest {
 	void sumsBeatDurationsPlusGapsBetweenBeatsButNotAfterTheLastOne() {
 		long durationMs = RhythmBeat.totalDurationMs(List.of(RhythmBeat.SHORT, RhythmBeat.SHORT, RhythmBeat.LONG));
 
-		assertThat(durationMs).isEqualTo(1900);
+		assertThat(durationMs).isEqualTo(1600);
+	}
+
+	@Test
+	void convertsRhythmToAPulsesArrayInterleavingBeatsAndGaps() {
+		List<Integer> pulses = RhythmBeat.toPulses(List.of(RhythmBeat.LONG, RhythmBeat.SHORT, RhythmBeat.MEDIUM));
+
+		assertThat(pulses).containsExactly(1000, 150, 150, 150, 700);
+	}
+
+	@Test
+	void pulsesSumMatchesTotalDurationMs() {
+		List<RhythmBeat> rhythm = List.of(RhythmBeat.SHORT, RhythmBeat.SHORT, RhythmBeat.LONG);
+
+		int sum = RhythmBeat.toPulses(rhythm).stream().mapToInt(Integer::intValue).sum();
+
+		assertThat(sum).isEqualTo(RhythmBeat.totalDurationMs(rhythm));
 	}
 }
