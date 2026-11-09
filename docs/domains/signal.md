@@ -20,6 +20,8 @@
 ## Pending Decisions
 
 - **기본 신호 템플릿 구성·개수**: `signal_templates` 실제 시드 데이터(이름·카테고리·아이콘·리듬) 미확정. — 기획 확인 필요.
+- **리듬 프리셋 시드 데이터**: `rhythm_presets` 실제 시드 데이터(리듬 구성) 미확정 — 기획 확인 필요. 현재는 테이블/API(GET /rhythm-presets, #57)만 구현, 실제 데이터는 넣지 않음.
+- **PATCH /signals/{signalId}에서 presetId 변경 허용 여부**: PRESET_IN_USE 에러 카탈로그 페이지는 이 에러가 PATCH에도 적용된다고 적혀 있으나, PATCH 자체의 명세 페이지(Request Body, 에러 목록)에는 presetId도 PRESET_IN_USE도 없음 — 두 Notion 문서가 서로 어긋남. 확정 전까지는 PATCH에 presetId 필드를 추가하지 않고 기존 명세(이름·설명·카테고리·아이콘·리듬만 수정)대로 유지. POST /signals의 presetId 중복 사용 검증(usedBy와 동일 기준, `SignalRepository.findByLinkIdAndRhythm`)은 #57에서 구현 완료. — eunsolee 확인 필요(PATCH에서 presetId 변경 허용 여부, 허용 시 본인이 쓰는 presetId는 자기 제외 처리).
 - **연결 승인 시 즐겨찾기 기본값 자동 지정** — 명세에 "협의"로 표시된 미확정 정책으로, 확정 전에는 구현하지 않음. `PUT /api/v1/links/{linkId}/favorite-signals`(S-4, #53) 자체는 구현 완료.
 - **연습 완료 시점**: 당사자 기기 ack 때 '연습함'으로 처리. — 기획 확인 필요.
 - **리듬 수정 시 연습 여부**: '연습 전'으로 되돌림. — 기획 확인 필요.

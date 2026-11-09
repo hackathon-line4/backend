@@ -18,5 +18,6 @@ public record CreateSignalCommand(
 		String description,
 		SignalCategory category,
 		String icon,
-		List<String> rhythm) {
+		List<String> rhythm,
+		UUID presetId) {
 }

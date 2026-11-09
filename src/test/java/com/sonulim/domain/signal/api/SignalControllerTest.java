@@ -184,7 +184,7 @@ class SignalControllerTest {
 		String token = bearerTokenFor(UUID.randomUUID());
 		String createBody = objectMapper.writeValueAsString(
 				new CreateSignalRequest(SignalSource.CUSTOM, null, "약 먹을 시간", "저녁 약", SignalCategory.DAILY, "pill",
-						List.of("SHORT", "SHORT", "LONG")));
+						List.of("SHORT", "SHORT", "LONG"), null));
 
 		// 1) 생성
 		String createResponse = mockMvc.perform(post("/api/v1/links/{linkId}/signals", linkId)
@@ -240,7 +240,7 @@ class SignalControllerTest {
 	void createRejectsAnInvalidRhythm() throws Exception {
 		UUID linkId = UUID.randomUUID();
 		String body = objectMapper.writeValueAsString(
-				new CreateSignalRequest(SignalSource.CUSTOM, null, "이름", null, SignalCategory.CHECK, "icon", List.of("SHORT")));
+				new CreateSignalRequest(SignalSource.CUSTOM, null, "이름", null, SignalCategory.CHECK, "icon", List.of("SHORT"), null));
 
 		mockMvc.perform(post("/api/v1/links/{linkId}/signals", linkId)
 						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID()))
@@ -258,7 +258,7 @@ class SignalControllerTest {
 		Signal existing = signalRepository.saveAndFlush(Signal.createCustom(linkId, "기존", null, SignalCategory.CHECK,
 				"icon", List.of(RhythmBeat.SHORT, RhythmBeat.LONG)));
 		String body = objectMapper.writeValueAsString(
-				new CreateSignalRequest(SignalSource.CUSTOM, null, "새 신호", null, SignalCategory.CHECK, "icon", List.of("SHORT", "LONG")));
+				new CreateSignalRequest(SignalSource.CUSTOM, null, "새 신호", null, SignalCategory.CHECK, "icon", List.of("SHORT", "LONG"), null));
 
 		mockMvc.perform(post("/api/v1/links/{linkId}/signals", linkId)
 						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID()))
@@ -276,7 +276,7 @@ class SignalControllerTest {
 	void createRejectsABlankName() throws Exception {
 		UUID linkId = UUID.randomUUID();
 		String body = objectMapper.writeValueAsString(
-				new CreateSignalRequest(SignalSource.CUSTOM, null, "", null, SignalCategory.CHECK, "icon", List.of("SHORT", "LONG")));
+				new CreateSignalRequest(SignalSource.CUSTOM, null, "", null, SignalCategory.CHECK, "icon", List.of("SHORT", "LONG"), null));
 
 		mockMvc.perform(post("/api/v1/links/{linkId}/signals", linkId)
 						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID()))
@@ -291,7 +291,7 @@ class SignalControllerTest {
 	void createRejectsARequesterWhoIsNotAGuardianWith403() throws Exception {
 		UUID linkId = UUID.randomUUID();
 		String body = objectMapper.writeValueAsString(
-				new CreateSignalRequest(SignalSource.CUSTOM, null, "이름", null, SignalCategory.CHECK, "icon", List.of("SHORT", "LONG")));
+				new CreateSignalRequest(SignalSource.CUSTOM, null, "이름", null, SignalCategory.CHECK, "icon", List.of("SHORT", "LONG"), null));
 
 		mockMvc.perform(post("/api/v1/links/{linkId}/signals", linkId)
 						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID(), "RECIPIENT"))
@@ -309,7 +309,7 @@ class SignalControllerTest {
 				"가자", "함께 이동하자는 뜻", SignalCategory.OUTING, "walk", List.of(RhythmBeat.LONG, RhythmBeat.LONG)));
 		String body = objectMapper
 				.writeValueAsString(new CreateSignalRequest(SignalSource.TEMPLATE, template.getId(), null, null, null,
-						null, null));
+						null, null, null));
 
 		mockMvc.perform(post("/api/v1/links/{linkId}/signals", linkId)
 						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID()))
@@ -333,7 +333,7 @@ class SignalControllerTest {
 				"walk", List.of(RhythmBeat.LONG, RhythmBeat.LONG)));
 		String body = objectMapper
 				.writeValueAsString(new CreateSignalRequest(SignalSource.TEMPLATE, template.getId(), null, null, null,
-						null, null));
+						null, null, null));
 
 		mockMvc.perform(post("/api/v1/links/{linkId}/signals", linkId)
 						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID()))
@@ -355,7 +355,7 @@ class SignalControllerTest {
 		signalRepository.saveAndFlush(deleted);
 		String body = objectMapper
 				.writeValueAsString(new CreateSignalRequest(SignalSource.TEMPLATE, template.getId(), null, null, null,
-						null, null));
+						null, null, null));
 
 		mockMvc.perform(post("/api/v1/links/{linkId}/signals", linkId)
 						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID()))
@@ -369,7 +369,7 @@ class SignalControllerTest {
 	void createFromTemplateReturns404ForAnUnknownTemplateId() throws Exception {
 		UUID linkId = UUID.randomUUID();
 		String body = objectMapper.writeValueAsString(
-				new CreateSignalRequest(SignalSource.TEMPLATE, UUID.randomUUID(), null, null, null, null, null));
+				new CreateSignalRequest(SignalSource.TEMPLATE, UUID.randomUUID(), null, null, null, null, null, null));
 
 		mockMvc.perform(post("/api/v1/links/{linkId}/signals", linkId)
 						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID()))
@@ -389,7 +389,7 @@ class SignalControllerTest {
 		String token = bearerTokenFor(UUID.randomUUID());
 		String idempotencyKey = UUID.randomUUID().toString();
 		String body = objectMapper.writeValueAsString(
-				new CreateSignalRequest(SignalSource.TEMPLATE, template.getId(), null, null, null, null, null));
+				new CreateSignalRequest(SignalSource.TEMPLATE, template.getId(), null, null, null, null, null, null));
 
 		String firstResponse = mockMvc.perform(post("/api/v1/links/{linkId}/signals", linkId)
 						.header(HttpHeaders.AUTHORIZATION, token)
@@ -417,7 +417,7 @@ class SignalControllerTest {
 	void createRequiresTheIdempotencyKeyHeader() throws Exception {
 		UUID linkId = UUID.randomUUID();
 		String body = objectMapper.writeValueAsString(
-				new CreateSignalRequest(SignalSource.CUSTOM, null, "이름", null, SignalCategory.CHECK, "icon", List.of("SHORT", "LONG")));
+				new CreateSignalRequest(SignalSource.CUSTOM, null, "이름", null, SignalCategory.CHECK, "icon", List.of("SHORT", "LONG"), null));
 
 		mockMvc.perform(post("/api/v1/links/{linkId}/signals", linkId)
 						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID()))
@@ -433,7 +433,7 @@ class SignalControllerTest {
 		String token = bearerTokenFor(UUID.randomUUID());
 		String idempotencyKey = UUID.randomUUID().toString();
 		String body = objectMapper.writeValueAsString(
-				new CreateSignalRequest(SignalSource.CUSTOM, null, "이름", null, SignalCategory.CHECK, "icon", List.of("SHORT", "LONG")));
+				new CreateSignalRequest(SignalSource.CUSTOM, null, "이름", null, SignalCategory.CHECK, "icon", List.of("SHORT", "LONG"), null));
 
 		String firstResponse = mockMvc.perform(post("/api/v1/links/{linkId}/signals", linkId)
 						.header(HttpHeaders.AUTHORIZATION, token)

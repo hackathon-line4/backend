@@ -20,9 +20,10 @@ public record CreateSignalRequest(
 		String description,
 		SignalCategory category,
 		String icon,
-		List<String> rhythm) {
+		List<String> rhythm,
+		UUID presetId) {
 
 	public CreateSignalCommand toCommand() {
-		return new CreateSignalCommand(source, templateId, name, description, category, icon, rhythm);
+		return new CreateSignalCommand(source, templateId, name, description, category, icon, rhythm, presetId);
 	}
 }
