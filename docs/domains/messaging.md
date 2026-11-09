@@ -3,6 +3,33 @@
 **담당:** 조한결
 **범위:** 신호 보내기(S-1, S-2), 응답 없음 판정(S-3), 수신 확인(ack)·진동 재생 보고·터치 응답(R-1 중 수신 태그), 더 기다리기, 다시 보내기, 신호 기록 상세(예외로 이 도메인에 포함)
 
+## 현재 구현
+
+- 신호 기록 도메인 모델 `messages` / `message_events` (#18). API 레이어는 `links`·`signals` 구현 후
+- 신호 한 건은 **기기 전달**(`delivery`)과 **터치 응답**(`response`) 두 상태를 따로 가진다. 상태 변경은 전부 `Message`의 메서드 안에서만 일어난다 — 한 축의 전이가 다른 축을 덮지 않게 하기 위해서다
+- 전달 완료는 당사자 앱의 ack로만 바꾼다. 푸시 발송 성공으로는 바꾸지 않는다
+  - ack 없이 터치가 먼저 오면 ack도 같은 시각으로 함께 기록한다 — 타임라인에서 '기기에 도착'이 빠지지 않게
+  - `UNCONFIRMED` 뒤에 늦게 온 ack도 `DELIVERED`로 받아들이고 `unconfirmedAt`은 남긴다
+- 진동 재생 보고는 누적 횟수라 **지금 값보다 큰 값만** 받아들인다. 보고가 순서 뒤바뀌어 도착해도 횟수가 줄지 않는다
+- '더 기다리기'는 `noResponseAt`을 지우지 않고 `WAITING`으로 되돌린다 — 판정이 한 번 있었다는 기록을 남긴다
+- 응답 없음 판정은 이미 `RESPONDED`인 기록을 덮지 않는다. 판정 타이머와 터치가 동시에 들어와도 응답이 이긴다
+- 신호 값은 보낸 시점 스냅샷(`signal_snapshot`, jsonb)으로 박제한다. 신호를 고치거나 지워도 과거 기록의 이름·리듬은 그대로다
+  - 스냅샷 record에 `isXxx()`/`getXxx()` 파생 접근자를 두지 않는다 — Jackson이 JSON 필드로 써 버려서 되읽을 때 깨진다. 긴급 여부 판정은 `Message`가 한다
+- `users`/`links`/`signals`는 FK 없이 UUID 값으로만 참조한다(docs/architecture.md: 도메인 패키지는 서로 직접 의존하지 않는다)
+- 기록 상세 타임라인은 `Message`가 상태를 바꿀 때 직접 남긴다 — 서비스가 따로 기록하면 전이를 추가할 때 빠뜨린다
+  - step 9개: `SENT` `FAILED` `DELIVERED` `UNCONFIRMED` `PLAYED` `RESPONDED` `NO_RESPONSE` `WAIT_EXTENDED` `EMERGENCY_WARNING`
+  - `PLAYED`는 줄을 하나만 두고 `meta.count`만 갱신한다(명세: "처음 보고 때 PLAYED를 남기고 이후에는 횟수만 갱신")
+- ack 판정 시간·응답 대기 시간은 아직 확정되지 않아 상수로 박지 않고 메서드 파라미터로 받는다
+
+### 후속 작업 (해당 기능 구현 시)
+
+- 서버 타이머(ack 판정 → `UNCONFIRMED`, 대기 만료 → `NO_RESPONSE`, 긴급 30초 → `emergencyWarning`). `ackDeadline`·`waitUntil`을 컬럼으로 들고 있어 서버가 재시작해도 살아남는다
+- `MessageRepository`와 조건부 UPDATE — 판정과 응답이 동시에 들어올 수 있다(서버 내부 처리 문서)
+- `canResend`: 원래 신호가 삭제되지 않았는지 — `signal` 도메인 구현 후
+- 신호 보내기·다시 보내기의 연결 구성원 검증(아니면 403이 아니라 404) — `link` 도메인 구현 후
+- 응답 대기 시간을 보호자의 `notification_settings.response_wait_minutes`에서 읽기 — `settings` 구현 후
+- `message.created`/`message.updated` 이벤트 발행과 푸시 — 실시간·푸시 구현 후
+
 ## Pending Decisions
 
 - **ack 판정 시간**: 60초(백엔드 제안). — 프론트·기획 확인 필요.
@@ -10,3 +37,5 @@
 - **긴급 신호 값**: 기능명세서 제안표 그대로(10초 반복, 최대 1분, 30초 경고, 방해 금지 무시). — 기획 확인 필요.
 - **판정 뒤 들어온 터치**: `RESPONDED` + `late: true`, 보호자에게 알림. — 기획·프론트 확인 필요.
 - **'더 기다리기' 때 당사자 기기 재알림**: 다시 울리지 않고 응답만 받음. — 기획 확인 필요.
+- **기록 상세의 `relatedHelpRequest`**: 도움 요청 뒤 30분 안에 보낸 신호면 그 요청 요약을 함께 보여 줌(백엔드 제안). 30분이 확정값이 아니라 아직 구현하지 않았고 `related_help_request_id` 컬럼만 잡아 뒀다. — 기획 확인 필요.
+- **전송 실패(`FAILED`) 뒤에 들어온 ack**: 명세 상태표가 `FAILED`를 종착으로만 적어 두고 이 경우를 다루지 않는다. 지금은 상태를 바꾸지 않는다(기록은 `FAILED`로 유지). — 기획 확인 필요.
