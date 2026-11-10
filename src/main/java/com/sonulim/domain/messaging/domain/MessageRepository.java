@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -27,6 +28,16 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
 			+ "com.sonulim.domain.messaging.domain.DeliveryStatus.UNCONFIRMED)) "
 			+ "order by m.requestedAt asc")
 	List<Message> findIncoming(@Param("recipientId") UUID recipientId);
+
+	/**
+	 * 한 연결에서 주어진 기간에 보호자가 보낸 신호를 오래된 순으로. 도움 요청 상세의 '요청 이후 주고받은 신호'에 쓴다.
+	 * 연습(PRACTICE)은 실제로 주고받은 신호가 아니라 제외한다.
+	 */
+	@Query("select m from Message m where m.linkId = :linkId "
+			+ "and m.kind = com.sonulim.domain.messaging.domain.MessageKind.SIGNAL "
+			+ "and m.requestedAt >= :from and m.requestedAt < :to order by m.requestedAt asc")
+	List<Message> findSentBetween(@Param("linkId") UUID linkId, @Param("from") LocalDateTime from,
+			@Param("to") LocalDateTime to, Pageable limit);
 
 	/** 기록 상세는 타임라인을 함께 쓰므로 한 번에 가져온다. */
 	@Query("select distinct m from Message m left join fetch m.timeline where m.id = :id")

@@ -9,6 +9,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -89,6 +90,17 @@ public class MessageQueryService {
 		}
 	}
 
+	/**
+	 * 한 연결에서 주어진 기간에 보호자가 보낸 신호. 다른 도메인(도움 요청 상세)이 쓰는 읽기 전용 창구다 —
+	 * 권한은 부르는 쪽이 이미 확인했으므로 여기서 다시 묻지 않는다.
+	 */
+	@Transactional(readOnly = true)
+	public List<SentSignal> sentBetween(UUID linkId, LocalDateTime from, LocalDateTime to, int limit) {
+		return messageRepository.findSentBetween(linkId, from, to, PageRequest.of(0, limit)).stream()
+				.map(SentSignal::from)
+				.toList();
+	}
+
 	LocalDateTime now() {
 		return LocalDateTime.now(clock);
 	}
@@ -103,5 +115,15 @@ public class MessageQueryService {
 	}
 
 	public record MessageDetail(Message message, UserSummary sender, UserSummary receiver, boolean canResend) {
+	}
+
+	/** 다른 도메인에 내주는 신호 한 건 요약. 보낸 시점 이름을 그대로 쓴다(스냅샷). */
+	public record SentSignal(UUID id, String signalName, LocalDateTime sentAt, LocalDateTime deliveredAt,
+			LocalDateTime respondedAt) {
+
+		static SentSignal from(Message message) {
+			return new SentSignal(message.getId(), message.getSignalSnapshot().name(), message.getRequestedAt(),
+					message.getDeliveredAt(), message.getRespondedAt());
+		}
 	}
 }
