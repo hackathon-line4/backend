@@ -22,16 +22,21 @@
 - 역할 선택 응답은 `{user, accessToken, refreshToken}` — 액세스 토큰에 역할이 담기므로 역할이 담긴 새 토큰을 바로 내려준다(팀 결정, 노션 명세 응답 갱신 대상). 같은 역할 재요청도 새 토큰을 발급하며 이전 갱신 토큰은 만료 전까지 유효
 - `GET /me`의 `links`는 빈 배열, `pendingLinkRequest`는 `null` — `link` 도메인 구현 후 채운다
 - Swagger: 인증이 필요한 API는 `@SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)`를 붙이면 Authorize 버튼으로 토큰을 넣어 호출할 수 있다
+- 기기·푸시 토큰 등록 `PUT /api/v1/me/devices/{installationId}` (#8) — `devices` 테이블, `installation_id`가 기본 키
+  - upsert: 같은 `pushToken`을 가진 다른 기기 행 삭제, 이 사용자의 다른 기기 삭제(사용자당 1대, 임시값), 같은 설치에서 다른 계정으로 로그인하면 소유자 변경
+  - 정리용 삭제는 벌크 쿼리로 바로 실행 — Hibernate는 flush 때 insert를 delete보다 먼저 보내 `push_token` unique 제약에 걸리기 때문
+  - 로그아웃하면 요청한 `installationId`의 기기 삭제(내 기기일 때만)
+  - 당사자가 `GET /me`를 부르면 기기의 `last_seen_at` 갱신. 요청에 기기 정보가 없어 사용자의 기기 전체(MVP는 1대)를 갱신
 
 ### 후속 작업 (해당 기능 구현 시)
 
-- 로그아웃: `installationId`의 기기 등록 삭제, 이 사용자의 SSE 연결 종료 (기기 등록·실시간 구현 시)
-- `GET /me`: 당사자 호출 시 `devices.last_seen_at` 갱신 (기기 등록 구현 시)
+- 다른 도메인용 푸시 대상 조회·무효 토큰 삭제 메서드, FCM 발송 코드(`PushSender`) 위치·담당 — 팀 회의에서 정한 뒤 추가
+- 로그아웃: 이 사용자의 SSE 연결 종료 (실시간 구현 시)
 - 역할 선택: 보호자 알림 설정 기본값, 당사자 위치 공유 기본값 생성 (settings 구현 시)
 
 ## Pending Decisions
 
 - **비밀번호 찾기**: 이메일 재설정 링크 방식(부가 기능). — 기획 확인 필요.
-- **기기 수**: 사용자당 활성 기기 1대(MVP). — 프론트 확인 필요.
+- **기기 수**: 사용자당 활성 기기 1대(MVP). — 프론트 확인 필요. 현재 이 값으로 구현(`DeviceService.register`) — 바뀌면 이 사용자의 다른 기기를 지우는 줄만 고치면 된다.
 - 비밀번호 8자 이상 + 영문/숫자 포함, JWT 액세스 1시간 / 갱신 30일(회전 방식)은 `공통 규칙` 문서에 확정되어 있음 — 별도 협의 불필요.
 - 로그인 실패 제한(10분 안 5회 → 10분 잠금, 서버 메모리 저장)은 팀 확정 — 별도 협의 불필요.
