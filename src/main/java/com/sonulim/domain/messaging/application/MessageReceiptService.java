@@ -22,8 +22,6 @@ import com.sonulim.global.security.AuthenticatedUser;
 @Service
 public class MessageReceiptService {
 
-	private static final String RECIPIENT = "RECIPIENT";
-
 	private final MessageRepository messageRepository;
 	private final MessagingProperties properties;
 	private final Clock clock;
@@ -59,18 +57,10 @@ public class MessageReceiptService {
 	 * <p>역할이 다르면 403, 내 기록이 아니면 <b>404</b>다 — 남의 기록이 존재한다는 사실 자체를 숨긴다(공통 규칙의 연결 범위).
 	 */
 	private Message findForRecipient(AuthenticatedUser user, UUID messageId) {
-		requireRecipient(user);
+		MessagingRoles.requireRecipient(user);
 		return messageRepository.findById(messageId)
 				.filter(message -> message.getRecipientId().equals(user.userId()))
 				.orElseThrow(() -> new SonulimException(ErrorCode.NOT_FOUND, "기록을 찾을 수 없어요"));
 	}
 
-	private void requireRecipient(AuthenticatedUser user) {
-		if (user.role() == null) {
-			throw new SonulimException(ErrorCode.ROLE_REQUIRED, "역할을 먼저 선택해 주세요");
-		}
-		if (!RECIPIENT.equals(user.role())) {
-			throw new SonulimException(ErrorCode.ROLE_MISMATCH, "당사자만 사용할 수 있어요");
-		}
-	}
 }

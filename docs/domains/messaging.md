@@ -30,6 +30,13 @@
   - 셋 다 재시도에 안전하다. 당사자 앱이 실패 시 자동으로 다시 보내기 때문에 같은 요청이 여러 번 와도 결과가 달라지지 않는다
   - 응답 대기 시간은 보호자가 고른 값(`notification_settings`)을 써야 하지만, settings 도메인 구현 전까지 `sonulim.messaging.default-response-wait-minutes`를 쓴다
   - 값이 없는 필드는 빼지 않고 `null`로 둔다(공통 규칙). 테스트에서 `jsonPath(...).doesNotExist()`는 "없음"과 "null"을 **둘 다 통과시키므로** 키 존재를 `hasKey`로 따로 확인한다
+- 조회·대기 연장 3종 (#65): `GET /messages/incoming` · `GET /messages/{id}` · `POST /messages/{id}/extend-wait`
+  - 받은 신호 조회는 보호자 이름을 `UserQueryService.findAll`로 **한 번에** 읽는다 — 항목마다 조회하면 목록 길이만큼 쿼리가 늘어난다
+  - 기록 상세는 `findWithTimeline`(fetch join)으로 타임라인을 같이 가져온다
+  - `canResend`는 원래 신호가 살아 있는지를 `SignalQueryService.getDetail`로 확인한다. signal 도메인이 조회 실패를 예외로 알려 주므로 그 예외를 false로 받는다 — 삭제 여부만 필요해서다
+  - `relatedHelpRequest`는 기준 시간(30분 제안)이 미확정이라 아직 항상 `null`이다
+  - 긴급 신호의 재생 정책(10초 반복·최대 60초·방해 금지 무시)은 `sonulim.messaging.emergency-playback` 설정값이다. 일반 신호는 `null`을 내려 앱 기본값을 쓰게 한다
+- 역할 검사는 `MessagingRoles`에 모았다 — 역할 미선택은 `ROLE_REQUIRED`, 다른 역할은 `ROLE_MISMATCH`
 - 타임라인은 `LAZY`다. 목록 조회에서 N+1이 나지 않게 유지하고, 기록 상세는 fetch join으로 가져온다 — 트랜잭션 밖에서 `getTimeline()`을 읽으면 터진다
 
 ### 후속 작업 (해당 기능 구현 시)

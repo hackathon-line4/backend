@@ -36,5 +36,10 @@ sonulim:
     emergency-warning-delay: 30s
     # 보호자가 고른 값(5/10/30분)을 써야 하지만 settings 도메인 구현 전까지 이 기본값을 쓴다.
     default-response-wait-minutes: 10
+    # 긴급 신호를 받은 기기가 따를 재생 정책. 기능 명세서 제안표 그대로이고 기획 확정 전이다.
+    emergency-playback:
+      repeat-interval-sec: 10
+      max-duration-sec: 60
+      bypass-dnd: true
     # 기한이 지난 기록을 훑는 주기(ms) = 판정이 늦어질 수 있는 최대 시간.
     timer-sweep-interval-ms: 5000

@@ -11,7 +11,15 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param emergencyWarningDelay       긴급 신호가 전달 후 이만큼 응답이 없으면 보호자에게 경고(백엔드 제안 30초)
  * @param defaultResponseWaitMinutes 응답 대기 시간. 원래는 보호자가 5/10/30분 중에 고른 값(notification_settings)을
  *                                   써야 하지만 settings 도메인 구현 전까지 이 기본값을 쓴다
+ * @param emergencyPlayback          긴급 신호를 받은 기기가 따를 재생 정책. 일반 신호는 앱 기본값(null)을 쓴다
  */
 @ConfigurationProperties(prefix = "sonulim.messaging")
-public record MessagingProperties(Duration emergencyWarningDelay, int defaultResponseWaitMinutes) {
+public record MessagingProperties(Duration emergencyWarningDelay, int defaultResponseWaitMinutes,
+		EmergencyPlayback emergencyPlayback) {
+
+	/**
+	 * 기능 명세서 제안표 그대로(10초 반복, 최대 1분, 방해 금지 무시). 기획 확정 전이라 설정으로 둔다.
+	 */
+	public record EmergencyPlayback(int repeatIntervalSec, int maxDurationSec, boolean bypassDnd) {
+	}
 }
