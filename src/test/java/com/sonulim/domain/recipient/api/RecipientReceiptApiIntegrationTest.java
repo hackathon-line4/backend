@@ -19,6 +19,8 @@ import com.sonulim.domain.recipient.domain.LocationStatus;
 import com.sonulim.domain.recipient.domain.RecipientSignal;
 import com.sonulim.domain.recipient.domain.RecipientSignalRepository;
 import com.sonulim.domain.recipient.domain.RecipientSignalType;
+import com.sonulim.global.push.LoggingPushSender;
+import com.sonulim.global.push.PushType;
 import com.sonulim.global.security.JwtTokenProvider;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -42,6 +44,9 @@ class RecipientReceiptApiIntegrationTest {
 	@Autowired
 	private JwtTokenProvider jwtTokenProvider;
 
+	@Autowired
+	private LoggingPushSender pushSender;
+
 	private UUID guardianId;
 	private UUID recipientId;
 	private String guardianToken;
@@ -50,6 +55,7 @@ class RecipientReceiptApiIntegrationTest {
 	void setUp() {
 		recipientSignalRepository.deleteAll();
 		helpRequestRepository.deleteAll();
+		pushSender.clear();
 		guardianId = UUID.randomUUID();
 		recipientId = UUID.randomUUID();
 		guardianToken = jwtTokenProvider.createAccessToken(guardianId, "GUARDIAN");
@@ -106,6 +112,39 @@ class RecipientReceiptApiIntegrationTest {
 
 		assertThat(helpRequestRepository.findById(request.getId()).orElseThrow().getGuardianOpenedAt())
 				.isEqualTo(first);
+	}
+
+	@Test
+	void openingAHelpRequestTellsTheRecipientItWasSeen() throws Exception {
+		HelpRequest request = givenHelpRequest();
+
+		report("help-requests", request.getId(), guardianToken, "OPENED").andExpect(status().isNoContent());
+
+		assertThat(pushSender.sent()).singleElement().satisfies(push -> {
+			assertThat(push.type()).isEqualTo(PushType.HELP_CONFIRMED);
+			// '확인함' 진동은 요청을 보낸 당사자에게 간다
+			assertThat(push.recipientUserId()).isEqualTo(recipientId);
+			assertThat(push.data()).containsEntry("helpRequestId", request.getId().toString());
+		});
+	}
+
+	@Test
+	void openingItAgainDoesNotBuzzTheRecipientTwice() throws Exception {
+		HelpRequest request = givenHelpRequest();
+
+		report("help-requests", request.getId(), guardianToken, "OPENED").andExpect(status().isNoContent());
+		report("help-requests", request.getId(), guardianToken, "OPENED").andExpect(status().isNoContent());
+
+		assertThat(pushSender.sent()).hasSize(1);
+	}
+
+	@Test
+	void arrivalAloneDoesNotTellTheRecipientAnything() throws Exception {
+		HelpRequest request = givenHelpRequest();
+
+		report("help-requests", request.getId(), guardianToken, "DELIVERED").andExpect(status().isNoContent());
+
+		assertThat(pushSender.sent()).isEmpty();
 	}
 
 	@Test

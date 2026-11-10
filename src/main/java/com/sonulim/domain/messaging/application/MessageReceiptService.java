@@ -44,6 +44,13 @@ public class MessageReceiptService {
 		findForRecipient(user, messageId).reportPlayback(count, LocalDateTime.now(clock));
 	}
 
+	/**
+	 * 터치 응답.
+	 *
+	 * <p>TODO 보호자에게 TOUCH_RESPONSE 푸시를 보내야 한다. "터치 응답 알림이 켜져 있으면"이 조건인데,
+	 *      NotificationSettingsService.get은 본인 조회용이라 보호자 설정을 읽을 창구가 없다(#71 참고).
+	 *      설정을 못 읽는 채로 보내면 꺼 둔 사람에게도 알림이 가므로 창구가 생긴 뒤 붙인다.
+	 */
 	@Transactional
 	public Message respond(AuthenticatedUser user, UUID messageId) {
 		Message message = findForRecipient(user, messageId);

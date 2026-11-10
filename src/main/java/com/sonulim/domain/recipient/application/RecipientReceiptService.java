@@ -13,6 +13,9 @@ import com.sonulim.domain.recipient.domain.RecipientSignal;
 import com.sonulim.domain.recipient.domain.RecipientSignalRepository;
 import com.sonulim.global.exception.ErrorCode;
 import com.sonulim.global.exception.SonulimException;
+import com.sonulim.global.push.PushMessage;
+import com.sonulim.global.push.PushType;
+import com.sonulim.global.push.PushSender;
 import com.sonulim.global.security.AuthenticatedUser;
 
 /**
@@ -27,12 +30,14 @@ public class RecipientReceiptService {
 
 	private final RecipientSignalRepository recipientSignalRepository;
 	private final HelpRequestRepository helpRequestRepository;
+	private final PushSender pushSender;
 	private final Clock clock;
 
 	public RecipientReceiptService(RecipientSignalRepository recipientSignalRepository,
-			HelpRequestRepository helpRequestRepository, Clock clock) {
+			HelpRequestRepository helpRequestRepository, PushSender pushSender, Clock clock) {
 		this.recipientSignalRepository = recipientSignalRepository;
 		this.helpRequestRepository = helpRequestRepository;
+		this.pushSender = pushSender;
 		this.clock = clock;
 	}
 
@@ -58,10 +63,15 @@ public class RecipientReceiptService {
 	 */
 	@Transactional
 	public boolean recordHelpRequestOpened(AuthenticatedUser user, UUID helpRequestId) {
-		boolean firstOpen = findHelpRequest(user, helpRequestId).markOpened(LocalDateTime.now(clock));
+		HelpRequest request = findHelpRequest(user, helpRequestId);
+		boolean firstOpen = request.markOpened(LocalDateTime.now(clock));
 		if (firstOpen) {
-			// TODO 푸시·실시간 구현 후: 재알림 중단과 당사자 HELP_CONFIRMED 발송을 여기서 건다.
-			//      지금은 markOpened가 남긴 열람 시각만으로 재알림 대상에서 빠진다.
+			// 첫 열람에서만 보낸다 — 상세를 다시 열 때마다 '확인함' 진동이 울리면 안 된다.
+			// 재알림은 markOpened가 남긴 열람 시각으로 대상에서 빠진다.
+			pushSender.send(PushMessage.to(request.getSenderId(), PushType.HELP_CONFIRMED)
+					.with("helpRequestId", request.getId().toString())
+					.with("linkId", request.getLinkId().toString())
+					.build());
 		}
 		return firstOpen;
 	}
