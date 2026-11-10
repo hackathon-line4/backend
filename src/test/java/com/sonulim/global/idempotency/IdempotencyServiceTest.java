@@ -39,6 +39,10 @@ class IdempotencyServiceTest {
 	private record SendResponse(String id, String status, List<String> rhythm) {
 	}
 
+	/** 실제 응답에는 거의 항상 시각이 들어간다. */
+	private record TimedResponse(String id, LocalDateTime requestedAt, LocalDateTime deliveredAt) {
+	}
+
 	private UUID userId;
 	private String key;
 	private AtomicInteger runs;
@@ -56,6 +60,25 @@ class IdempotencyServiceTest {
 			runs.incrementAndGet();
 			return new SendResponse("msg_" + runs.get(), "REQUESTED", List.of("SHORT", "LONG"));
 		});
+	}
+
+	@Test
+	void aResponseWithTimestampsCanBeReplayed() {
+		// 앱의 ObjectMapper는 LocalDateTime을 +09:00 문자열로 쓰는데 그 형식을 다시 읽지는 못한다.
+		// 보관용 변환기를 따로 쓰지 않으면 시각이 든 응답은 재시도가 전부 깨진다.
+		LocalDateTime requestedAt = LocalDateTime.of(2026, 11, 4, 18, 2, 1);
+		TimedResponse first = idempotencyService.execute(userId, key, new SendRequest("sig_12"),
+				TimedResponse.class, () -> new TimedResponse("msg_1", requestedAt, null));
+
+		TimedResponse retried = idempotencyService.execute(userId, key, new SendRequest("sig_12"),
+				TimedResponse.class, () -> {
+					throw new IllegalStateException("재시도에서 작업이 다시 돌면 안 된다");
+				});
+
+		assertThat(retried).isEqualTo(first);
+		assertThat(retried.requestedAt()).isEqualTo(requestedAt);
+		// 값이 없던 시각은 null로 돌아온다
+		assertThat(retried.deliveredAt()).isNull();
 	}
 
 	@Test

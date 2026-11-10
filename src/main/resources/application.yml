@@ -31,6 +31,8 @@ sonulim:
     # 기한이 지난 기록을 지우는 주기(ms). 기본 1시간.
     cleanup-interval-ms: 3600000
   messaging:
+    # 신호를 보낸 뒤 이만큼 ack가 없으면 UNCONFIRMED. 백엔드 제안값이고 기획·프론트 확인 전이다.
+    ack-timeout: 60s
     # 긴급 신호 전달 후 이만큼 무응답이면 보호자에게 경고. 백엔드 제안값이고 기획 확정 전이다
     # (docs/domains/messaging.md의 Pending Decisions).
     emergency-warning-delay: 30s
