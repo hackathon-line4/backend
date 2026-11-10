@@ -131,4 +131,16 @@ class SignalRepositoryTest {
 
 		assertThat(found).isEmpty();
 	}
+
+	@Test
+	void existsByLinkIdAndTemplateIdIsTrueOnlyForThatExactLinkAndTemplate() {
+		UUID linkId = UUID.randomUUID();
+		UUID templateId = UUID.randomUUID();
+		entityManager.persistAndFlush(Signal.fromTemplate(linkId, templateId, "가자", null, SignalCategory.OUTING,
+				"walk", List.of(RhythmBeat.LONG, RhythmBeat.LONG)));
+
+		assertThat(repository.existsByLinkIdAndTemplateId(linkId, templateId)).isTrue();
+		assertThat(repository.existsByLinkIdAndTemplateId(linkId, UUID.randomUUID())).isFalse();
+		assertThat(repository.existsByLinkIdAndTemplateId(UUID.randomUUID(), templateId)).isFalse();
+	}
 }
