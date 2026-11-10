@@ -23,6 +23,12 @@ public class PassThroughLinkAccessGuardConfig {
 			public void verifyAccessible(UUID linkId, UUID requesterId) {
 				// 통과시킨다 — 테스트 전용.
 			}
+
+			@Override
+			public LinkMembers requireMembers(UUID linkId, UUID requesterId) {
+				// 실제 연결이 없으니 구성원을 알 수 없다. 전송 API 테스트는 실제 연결을 만들어 쓴다.
+				throw new UnsupportedOperationException("통과용 설정은 연결 구성원을 알 수 없어요");
+			}
 		};
 	}
 }
