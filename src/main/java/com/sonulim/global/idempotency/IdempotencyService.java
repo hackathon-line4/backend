@@ -14,6 +14,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.sonulim.global.exception.ErrorCode;
 import com.sonulim.global.exception.SonulimException;
 
@@ -33,11 +36,19 @@ import com.sonulim.global.exception.SonulimException;
 public class IdempotencyService {
 
 	private final IdempotencyRecordRepository repository;
-	private final ObjectMapper objectMapper;
 
-	public IdempotencyService(IdempotencyRecordRepository repository, ObjectMapper objectMapper) {
+	/**
+	 * 보관용 변환기. 앱의 ObjectMapper를 쓰지 않는다 — 거기엔 LocalDateTime을 +09:00 문자열로 쓰는
+	 * 응답 전용 직렬화가 걸려 있어서, 저장한 값을 다시 읽을 때 파싱에 실패한다(쓰기와 읽기가 비대칭).
+	 * 여기 저장되는 값은 내부 보관본이고, 돌려줄 때 앱의 ObjectMapper가 다시 응답 형식으로 바꾼다.
+	 */
+	private final ObjectMapper objectMapper = JsonMapper.builder()
+			.addModule(new JavaTimeModule())
+			.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+			.build();
+
+	public IdempotencyService(IdempotencyRecordRepository repository) {
 		this.repository = repository;
-		this.objectMapper = objectMapper;
 	}
 
 	/**
