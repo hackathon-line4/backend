@@ -18,9 +18,14 @@
 - 데이터 모델 초안에는 `link_id`만 있지만 보낸 사람·받는 사람 UUID를 함께 둔다 — 연결을 거치지 않고도 "내 기록인지" 판단하기 위해서다(messaging의 `Message`와 같은 이유)
 - **Hibernate는 임베디드의 모든 컬럼이 null이면 필드를 null로 되돌린다.** 아직 아무도 받지 않은 기록을 다시 읽으면 `receipt`가 null이 되어 다음 보고에서 NPE가 난다 — 쓸 때마다 되살리는 접근자를 거친다. `CapturedLocation`도 같은 성질이지만 그쪽은 "위치 없음"이 의미 있는 상태라 그대로 둔다
 
+- 도착·열람 기록 2종 (#31): `POST /recipient-signals/{id}/receipts` · `POST /help-requests/{id}/receipts`. 이 연결의 보호자만
+  - 푸시 수신 핸들러가 중복 호출될 수 있어 같은 보고가 여러 번 와도 안전하다
+  - 역할이 다르면 403, 내 기록이 아니면 404(존재 자체를 숨김)
+  - 첫 열람 여부를 서비스가 돌려준다 — 재알림 중단과 `HELP_CONFIRMED` 발송을 걸 자리이고, 푸시 구현 후 채운다
+
 ### 후속 작업 (해당 기능 구현 시)
 
-- 엔드포인트 6개 — `link` 도메인 구현 후(생성 2개가 `linkId`를 받는다)
+- 엔드포인트 4개 — `link` 도메인 구현 후(생성 2개가 `linkId`를 받는다)
 - 도움 요청 상세의 `sender.name`, `followingMessages`(요청 이후 보호자가 보낸 신호 최대 20건) — `account` 이름 조회와 `messaging` 조회가 필요
 - `HELP_REQUEST` 재알림 타이머(1분 간격 최대 5회) — 열람되면 중단. messaging 타이머와 같은 구조로
 - 주소 변환 — 지도 API 업체·키 미정
