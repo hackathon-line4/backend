@@ -46,6 +46,9 @@ public class Link extends BaseEntity {
 	@Column(nullable = false)
 	private LocalDateTime linkedAt;
 
+	// 연결 해제(L-4) 시각. 행은 지우지 않는다(Notion API 명세).
+	private LocalDateTime endedAt;
+
 	@Column(unique = true)
 	private UUID activeGuardianId;
 
@@ -66,6 +69,24 @@ public class Link extends BaseEntity {
 
 	public static Link connect(UUID guardianId, UUID recipientId, LocalDateTime now) {
 		return new Link(guardianId, recipientId, now);
+	}
+
+	/**
+	 * 연결을 끝낸다. 1:1 유니크 컬럼을 비워 두 사람 모두 다시 연결할 수 있게 한다.
+	 * 이미 끝난 연결이면 그대로 둔다 — 다시 해제해도 같은 204로 응답한다(docs/domains/link.md Pending Decisions).
+	 */
+	public void end(LocalDateTime now) {
+		if (status == LinkStatus.ENDED) {
+			return;
+		}
+		this.status = LinkStatus.ENDED;
+		this.endedAt = now;
+		this.activeGuardianId = null;
+		this.activeRecipientId = null;
+	}
+
+	public LocalDateTime getEndedAt() {
+		return endedAt;
 	}
 
 	public UUID getId() {
