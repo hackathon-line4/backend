@@ -55,6 +55,30 @@ class GlobalExceptionHandlerTest {
 				.andExpect(jsonPath("$.error.field").value("email"));
 	}
 
+	@Test
+	void invalidPathVariableTypeMapsTo400InsteadOf500() throws Exception {
+		mockMvc.perform(get("/test/by-id/not-a-uuid"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.error.field").value("id"));
+	}
+
+	@Test
+	void invalidQueryParamEnumValueMapsTo400InsteadOf500() throws Exception {
+		mockMvc.perform(get("/test/by-category").queryParam("category", "NOT_A_CATEGORY"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.error.field").value("category"));
+	}
+
+	@Test
+	void missingRequiredQueryParamMapsTo400InsteadOf500() throws Exception {
+		mockMvc.perform(get("/test/requires-link-id"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.error.code").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.error.field").value("linkId"));
+	}
+
 	@RestController
 	static class TestController {
 
@@ -72,7 +96,24 @@ class GlobalExceptionHandlerTest {
 		void validate(@RequestBody @Valid TestRequest request) {
 		}
 
+		@GetMapping("/test/by-id/{id}")
+		void byId(@org.springframework.web.bind.annotation.PathVariable java.util.UUID id) {
+		}
+
+		@GetMapping("/test/by-category")
+		void byCategory(
+				@org.springframework.web.bind.annotation.RequestParam(required = false) TestCategory category) {
+		}
+
+		@GetMapping("/test/requires-link-id")
+		void requiresLinkId(@org.springframework.web.bind.annotation.RequestParam java.util.UUID linkId) {
+		}
+
 		record TestRequest(@NotBlank(message = "이메일 형식이 아니에요") String email) {
+		}
+
+		enum TestCategory {
+			A, B
 		}
 	}
 }

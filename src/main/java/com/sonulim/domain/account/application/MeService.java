@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,16 +19,27 @@ public class MeService {
 
 	private final UserRepository userRepository;
 	private final TokenService tokenService;
+	private final DeviceService deviceService;
+	private final ApplicationEventPublisher eventPublisher;
 	private final Clock clock;
 
-	public MeService(UserRepository userRepository, TokenService tokenService, Clock clock) {
+	public MeService(UserRepository userRepository, TokenService tokenService, DeviceService deviceService,
+			ApplicationEventPublisher eventPublisher, Clock clock) {
 		this.userRepository = userRepository;
 		this.tokenService = tokenService;
+		this.deviceService = deviceService;
+		this.eventPublisher = eventPublisher;
 		this.clock = clock;
 	}
 
+	@Transactional
 	public User getMe(UUID userId) {
-		return findUser(userId);
+		User user = findUser(userId);
+		// 당사자가 앱을 마지막으로 연 시각을 기기에 남긴다(API 명세: 당사자 호출 시 last_seen_at 갱신).
+		if (user.getRole() == Role.RECIPIENT) {
+			deviceService.markSeen(userId);
+		}
+		return user;
 	}
 
 	/**
@@ -37,6 +49,7 @@ public class MeService {
 	public AuthResult selectRole(UUID userId, Role role) {
 		User user = findUser(userId);
 		user.selectRole(role, LocalDateTime.now(clock));
+		eventPublisher.publishEvent(new RoleSelectedEvent(user.getId(), user.getRole()));
 		return AuthResult.of(tokenService.issue(user), user);
 	}
 

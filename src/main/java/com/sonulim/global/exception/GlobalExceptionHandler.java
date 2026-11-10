@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -48,10 +49,25 @@ public class GlobalExceptionHandler {
 		return validationFailed(INVALID_REQUEST, field);
 	}
 
-	/** 경로 변수나 쿼리 파라미터의 타입이 맞지 않는다(UUID 자리에 아무 문자열 등). */
+	/**
+	 * 경로 변수·쿼리 파라미터가 선언된 타입(UUID, enum 등)으로 변환되지 않을 때 — 잘못된
+	 * 요청이지 서버 오류가 아니므로 500이 아니라 400으로 내려준다.
+	 */
 	@ExceptionHandler(MethodArgumentTypeMismatchException.class)
 	public ResponseEntity<ApiResponse<Void>> handleTypeMismatch(MethodArgumentTypeMismatchException exception) {
-		return validationFailed(INVALID_REQUEST, exception.getName());
+		return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+				.body(ApiResponse.error(ErrorCode.VALIDATION_FAILED, "요청 형식이 올바르지 않아요", exception.getName(), null));
+	}
+
+	/**
+	 * 필수 쿼리 파라미터(예: GET /rhythm-presets의 linkId)가 아예 없을 때 — 잘못된 요청이지
+	 * 서버 오류가 아니므로 500이 아니라 400으로 내려준다.
+	 */
+	@ExceptionHandler(MissingServletRequestParameterException.class)
+	public ResponseEntity<ApiResponse<Void>> handleMissingParameter(MissingServletRequestParameterException exception) {
+		return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+				.body(ApiResponse.error(ErrorCode.VALIDATION_FAILED, "요청에 필요한 값이 없어요", exception.getParameterName(),
+						null));
 	}
 
 	@ExceptionHandler(Exception.class)
