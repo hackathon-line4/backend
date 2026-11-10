@@ -59,7 +59,7 @@ class MessageReceiptApiIntegrationTest {
 	private Message givenSentMessage(MessageKind kind) {
 		return messageRepository.save(Message.send(UUID.randomUUID(), guardianId, recipientId, kind,
 				new SignalSnapshot(UUID.randomUUID(), "약 먹을 시간", "저녁 약을 먹자는 뜻", SignalCategory.DAILY,
-						"pill", List.of("SHORT", "SHORT", "LONG"), 1900),
+						"pill", List.of("SHORT", "SHORT", "LONG"), List.of(150, 150, 150, 150, 1000), 1900),
 				LocalDateTime.now(), Duration.ofSeconds(60)));
 	}
 

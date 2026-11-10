@@ -15,7 +15,11 @@ import com.sonulim.domain.messaging.domain.MessageKind;
 public record IncomingMessageResponse(UUID id, MessageKind kind, boolean isEmergency, String guardianName,
 		Signal signal, PlaybackPolicy playbackPolicy, LocalDateTime waitUntil, LocalDateTime sentAt) {
 
-	public record Signal(String name, List<String> rhythm, int durationMs) {
+	/**
+	 * @param pulses 기기가 실제로 이 배열을 보고 울린다. 기본 신호는 rhythm이 null일 수 있으므로
+	 *               리듬만 보내면 진동이 아예 울리지 않는다
+	 */
+	public record Signal(String name, List<String> rhythm, List<Integer> pulses, int durationMs) {
 	}
 
 	/** null은 앱 기본값을 쓰라는 뜻이다. 긴급 신호만 값이 채워진다. */
@@ -26,7 +30,7 @@ public record IncomingMessageResponse(UUID id, MessageKind kind, boolean isEmerg
 			MessagingProperties.EmergencyPlayback emergency) {
 		var snapshot = message.getSignalSnapshot();
 		return new IncomingMessageResponse(message.getId(), message.getKind(), message.isEmergency(), guardianName,
-				new Signal(snapshot.name(), snapshot.rhythm(), snapshot.durationMs()),
+				new Signal(snapshot.name(), snapshot.rhythm(), snapshot.pulses(), snapshot.durationMs()),
 				playbackPolicy(message, emergency), message.getWaitUntil(), message.getRequestedAt());
 	}
 

@@ -29,10 +29,14 @@
   - messaging 조회는 `MessageQueryService.sentBetween`을 거친다 — 권한은 부르는 쪽이 이미 확인했으므로 거기서 다시 묻지 않는다. 연습(`PRACTICE`)은 주고받은 신호가 아니라 제외한다
 
 - 도움 요청 첫 열람에 당사자에게 `HELP_CONFIRMED` 푸시를 보낸다 (#71). **첫 열람에서만** — 상세를 다시 열 때마다 '확인함' 진동이 울리면 안 된다
+- 위치 붙이기 `PUT /help-requests/{id}/location` (#69). 요청을 보낸 당사자 본인만, 남의 요청이면 404
+  - 도움 요청이 위치를 기다리느라 늦어지면 안 되므로 `PENDING`으로 먼저 보내고 얻는 대로 여기서 채운다
+  - `PENDING`일 때만 가능하고 한 번 정해지면 `LOCATION_ALREADY_SET`. 받는 상태는 `ATTACHED`/`UNAVAILABLE` 둘뿐이다 — `NOT_SHARED`는 요청을 만들 때 서버가 판단하는 값이라 여기서 받지 않는다
+  - 주소는 비워 둔다. 좌표를 주소로 바꾸는 외부 연동이 정해지면 채운다(명세가 `null`을 허용)
 
 ### 후속 작업 (해당 기능 구현 시)
 
-- 엔드포인트 4개 — `link` 도메인 구현 후(생성 2개가 `linkId`를 받는다)
+- 엔드포인트 2개 — `link` 도메인 구현 후(생성 2개가 `linkId`를 받는다)
 - 도움 요청 상세의 `sender.name`, `followingMessages`(요청 이후 보호자가 보낸 신호 최대 20건) — `account` 이름 조회와 `messaging` 조회가 필요
 - `HELP_REQUEST` 재알림 타이머(1분 간격 최대 5회) — 열람되면 중단. messaging 타이머와 같은 구조로
 - 주소 변환 — 지도 API 업체·키 미정

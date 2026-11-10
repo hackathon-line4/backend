@@ -20,7 +20,7 @@ public record MessageResponse(UUID id, MessageKind kind, UUID linkId, boolean is
 		boolean emergencyWarning, UUID resendOf, UUID relatedHelpRequestId, LocalDateTime createdAt) {
 
 	public record Signal(UUID id, String name, String description, SignalCategory category, String icon,
-			List<String> rhythm, int durationMs) {
+			List<String> rhythm, List<Integer> pulses, int durationMs) {
 	}
 
 	public record Party(UUID id, String name) {
@@ -41,7 +41,7 @@ public record MessageResponse(UUID id, MessageKind kind, UUID linkId, boolean is
 		var snapshot = message.getSignalSnapshot();
 		return new MessageResponse(message.getId(), message.getKind(), message.getLinkId(), message.isEmergency(),
 				new Signal(snapshot.signalId(), snapshot.name(), snapshot.description(), snapshot.category(),
-						snapshot.icon(), snapshot.rhythm(), snapshot.durationMs()),
+						snapshot.icon(), snapshot.rhythm(), snapshot.pulses(), snapshot.durationMs()),
 				party(message.getGuardianId(), sender), party(message.getRecipientId(), receiver),
 				new Delivery(message.getDeliveryStatus(), message.getFailureReason(), message.getRequestedAt(),
 						message.getDeliveredAt(), message.getUnconfirmedAt()),
