@@ -143,4 +143,21 @@ class SignalRepositoryTest {
 		assertThat(repository.existsByLinkIdAndTemplateId(linkId, UUID.randomUUID())).isFalse();
 		assertThat(repository.existsByLinkIdAndTemplateId(UUID.randomUUID(), templateId)).isFalse();
 	}
+
+	@Test
+	void existsByLinkIdAndTemplateIdAndDeletedAtIsNullIsFalseForASoftDeletedSignal() {
+		UUID linkId = UUID.randomUUID();
+		UUID templateId = UUID.randomUUID();
+		Signal signal = Signal.fromTemplate(linkId, templateId, "가자", null, SignalCategory.OUTING, "walk",
+				List.of(RhythmBeat.LONG, RhythmBeat.LONG));
+		signal.softDelete();
+		entityManager.persistAndFlush(signal);
+
+		assertThat(repository.existsByLinkIdAndTemplateIdAndDeletedAtIsNull(linkId, templateId)).isFalse();
+		// 삭제되지 않은 경우엔 true여야 재추가 차단(TEMPLATE_ALREADY_ADDED)이 실제로 동작한다.
+		Signal active = Signal.fromTemplate(linkId, UUID.randomUUID(), "밥 먹자", null, SignalCategory.DAILY, "meal",
+				List.of(RhythmBeat.SHORT, RhythmBeat.SHORT));
+		entityManager.persistAndFlush(active);
+		assertThat(repository.existsByLinkIdAndTemplateIdAndDeletedAtIsNull(linkId, active.getTemplateId())).isTrue();
+	}
 }
