@@ -15,7 +15,8 @@
   - `LinkRequest`(`link_requests`): `PENDING` → `APPROVED`/`REJECTED`/`CANCELED`/`EXPIRED`. 요청한 뒤 10분 유효. `PENDING`이 아닌 요청을 바꾸려 하면 409 `LINK_REQUEST_NOT_PENDING`(`details.status`에 현재 상태).
   - 만료는 서버 타이머 없이 요청을 읽거나 바꿀 때 판정한다(조회·목록·취소·승인·거절·요청 보내기). 명세의 "조회 시점에 `EXPIRED`로 바꿔 돌려준다"를 모든 경로에 적용한 것이다.
   - 요청 보내기의 코드 검사는 코드 확인과 같은 코드(`LinkCodeChecker`)를 쓴다 — 같은 오류 코드, 같은 무작위 대입 시도 제한. 같은 당사자의 이전 `PENDING` 요청은 `CANCELED`로 바꾼다. `Idempotency-Key`는 연결 코드와 같은 방식(`(recipient_id, idempotency_key)` 유니크).
-  - 승인은 한 트랜잭션에서 요청 확인 → `Link` 생성 → 요청 `APPROVED` → 코드 `usedAt`. 거절은 코드를 그대로 둔다(만료 전이면 다른 당사자가 다시 쓸 수 있음).
+  - 승인은 한 트랜잭션에서 요청 확인 → `Link` 생성 → 기본 신호 채우기 → 요청 `APPROVED` → 코드 `usedAt`. 거절은 코드를 그대로 둔다(만료 전이면 다른 당사자가 다시 쓸 수 있음).
+  - 기본 신호 채우기 (#78): 연결 생성 직후 `global.signalseed.DefaultSignalSeeder.seedDefaults(linkId)`를 부른다. 구현은 signal 도메인(`SignalTemplateSeeder`, #52)이 `signal_templates` 카탈로그 전체를 이 연결의 신호로 복사한다. link는 signal을 직접 import하지 않는다. 같은 트랜잭션이라 기본 신호 채우기가 실패하면 승인 전체가 롤백되고(500 `INTERNAL_ERROR`, 요청은 `PENDING` 그대로), 승인이 실패하면 채운 신호도 남지 않는다.
   - 승인·거절·취소는 요청 행을 비관적 락으로 읽어, 동시에 와도 하나만 상태를 바꾼다.
   - 조회는 요청의 보호자·당사자만, 승인·거절은 그 요청의 보호자만, 취소는 그 요청의 당사자만. 남의 요청과 형식이 틀린 id는 없는 요청과 같은 404 `NOT_FOUND`.
   - 목록: 내가 보호자인 요청만 최신순. `status`가 있으면 그 상태 전체, 없으면 최근 24시간 전체. 잘못된 `status`는 400 `VALIDATION_FAILED`(`field=status`).
@@ -55,7 +56,7 @@
   - 취소: 보호자에게 `link_request.updated`.
   - 승인·거절: 당사자에게 `LINK_RESULT` 푸시 + `link_request.updated`.
   - 만료: 당사자에게 `LINK_RESULT` 푸시 + `link_request.updated` — 이걸 보내려면 만료를 정해진 시각에 처리하는 서버 타이머가 필요하다. 스케줄링 설정(`global.SchedulingConfig`)은 messaging PR #21에 있으므로 그 뒤에 붙인다.
-- 승인 시 기본 신호 세트 복사·자주 쓰는 신호 6개 채우기 (`signal` 도메인 구현 시, Pending Decisions 참고).
+- 승인 시 자주 쓰는 신호 6개 채우기 — 정책 미정(Pending Decisions "기본 신호 세트"). 기본 신호 복사는 #78에서 붙였다.
 - account `GET /me`·로그인 응답의 `links`·`pendingLinkRequest` 채우기 — account 코드라 담당자(최용주)와 함께 진행.
 - 연결 해제 뒤 처리 (#41에서 뺀 것):
   - 당사자에게 `link.updated` 이벤트(SSE 허브 #39 머지 후).
@@ -68,7 +69,7 @@
 ## Pending Decisions
 
 - **연결 확인 타임아웃**: 30초(백엔드 제안). — 프론트 확인 필요.
-- **기본 신호 세트**: 연결 승인 시(`POST /link-requests/{id}/approve`) 이 연결의 신호 목록에 기본 신호를 자동 추가하고 자주 쓰는 신호 6개를 채운다(명세에 "협의"로 표시) — 실제 추가 로직은 `signal` 도메인과 조율 필요. #37 승인에는 아직 넣지 않았다.
+- **기본 신호 세트**: 연결 승인 시(`POST /link-requests/{id}/approve`) 이 연결의 신호 목록에 기본 신호를 자동 추가하고 자주 쓰는 신호 6개를 채운다(명세에 "협의"로 표시) — 기본 신호 추가는 #78에서 붙였다(카탈로그 구성은 signal 도메인 문서). 자주 쓰는 신호 6개 자동 지정은 signal 문서에도 "협의"로 남아 있어 아직 넣지 않았다.
 - **연결 해제 뒤 기록**: 기록은 남기되 조회 불가, 보관 기간 뒤 삭제(기획 확정 필요) — `history` 도메인과 보관 정책 공유. #41은 기록을 건드리지 않는다.
 - **이미 해제된 연결 다시 해제**: 명세에 없는 경우. 재시도해도 결과(해제됨)가 같으므로 다시 204로 응답한다(팀 결정, #41). — 프론트 확인 필요.
 - **사용된 코드 재사용 금지**: 명세에 없는 보수적 결정(팀 결정, #41). 승인에 쓴 코드는 만료 전이어도 코드 확인·요청 보내기에서 `LINK_CODE_NOT_FOUND`. 1:1에서는 `ALREADY_LINKED`로 막혔지만 연결 해제 뒤에는 막을 것이 없어서 넣었다. — 기획 확인 필요.
