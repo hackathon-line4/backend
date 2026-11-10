@@ -8,8 +8,6 @@ import com.sonulim.domain.signal.domain.SignalCategory;
 import com.sonulim.domain.signal.domain.SignalRepository;
 import com.sonulim.domain.signal.domain.SignalTemplate;
 import com.sonulim.domain.signal.domain.SignalTemplateRepository;
-import com.sonulim.global.exception.ErrorCode;
-import com.sonulim.global.exception.SonulimException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -76,9 +74,7 @@ class SignalTemplateSeederIntegrationTest {
 		UUID linkId = UUID.randomUUID();
 
 		assertThatThrownBy(() -> seeder.seedDefaults(linkId))
-				.isInstanceOf(SonulimException.class)
-				.extracting(e -> ((SonulimException) e).getErrorCode())
-				.isEqualTo(ErrorCode.RHYTHM_DUPLICATE);
+				.isInstanceOf(IllegalStateException.class);
 
 		assertThat(signalRepository.findByLinkIdAndDeletedAtIsNull(linkId)).isEmpty();
 	}

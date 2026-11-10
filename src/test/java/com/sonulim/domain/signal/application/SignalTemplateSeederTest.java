@@ -11,7 +11,6 @@ import com.sonulim.domain.signal.domain.SignalRepository;
 import com.sonulim.domain.signal.domain.SignalSource;
 import com.sonulim.domain.signal.domain.SignalTemplate;
 import com.sonulim.domain.signal.domain.SignalTemplateRepository;
-import com.sonulim.global.exception.ErrorCode;
 import com.sonulim.global.exception.SonulimException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -83,8 +82,14 @@ class SignalTemplateSeederTest {
 		verify(signalRepository, never()).save(any());
 	}
 
+	/**
+	 * 새로 승인된 연결은 이 시점에 신호가 하나도 없으므로, 실제로는 카탈로그 자체에 같은
+	 * 리듬의 템플릿이 두 개 있을 때만 이 충돌이 난다 — 즉 보호자 입력 문제가 아니라
+	 * signal_templates 데이터 버그다. 그래서 승인 API에 RHYTHM_DUPLICATE를 그대로
+	 * 노출하지 않고 내부 오류로 처리한다(은솔님 PR #52 리뷰).
+	 */
 	@Test
-	void rejectsATemplateWhoseRhythmCollidesWithAnExistingSignalInTheLink() {
+	void treatsATemplateRhythmCollisionAsAnInternalErrorInsteadOfLeakingRhythmDuplicate() {
 		SignalTemplate template = new SignalTemplate("가자", null, SignalCategory.OUTING, "walk",
 				List.of(RhythmBeat.LONG, RhythmBeat.LONG), RhythmBeat.toPulses(List.of(RhythmBeat.LONG, RhythmBeat.LONG)));
 		Signal conflicting = Signal.createCustom(linkId, "다른 이름", null, SignalCategory.CHECK, "icon",
@@ -94,9 +99,8 @@ class SignalTemplateSeederTest {
 				.willReturn(Optional.of(conflicting));
 
 		assertThatThrownBy(() -> seeder().seedDefaults(linkId))
-				.isInstanceOf(SonulimException.class)
-				.extracting(e -> ((SonulimException) e).getErrorCode())
-				.isEqualTo(ErrorCode.RHYTHM_DUPLICATE);
+				.isInstanceOf(IllegalStateException.class)
+				.isNotInstanceOf(SonulimException.class);
 		verify(signalRepository, never()).save(any());
 	}
 

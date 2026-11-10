@@ -7,8 +7,6 @@ import com.sonulim.domain.signal.domain.Signal;
 import com.sonulim.domain.signal.domain.SignalRepository;
 import com.sonulim.domain.signal.domain.SignalTemplate;
 import com.sonulim.domain.signal.domain.SignalTemplateRepository;
-import com.sonulim.global.exception.ErrorCode;
-import com.sonulim.global.exception.SonulimException;
 import com.sonulim.global.signalseed.DefaultSignalSeeder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,13 +46,19 @@ public class SignalTemplateSeeder implements DefaultSignalSeeder {
 	}
 
 	/**
-	 * SignalCommandService.ensurePulsesNotDuplicated와 같은 규칙: 이 연결에 같은 진동(pulses)이
-	 * 이미 있으면 안 된다. 여러 템플릿을 한 번에 넣는 도중 충돌이 나면 트랜잭션 전체를
-	 * 롤백해서 일부만 만들어진 상태가 되지 않게 한다.
+	 * 새로 승인된 연결은 이 시점에 신호가 하나도 없으므로, 이 충돌은 사실상 signal_templates
+	 * 카탈로그 자체에 같은 진동(pulses)의 템플릿이 두 개 있다는 뜻이다 — 보호자가 유발한
+	 * 문제가 아니라 우리 쪽 데이터 버그다. 그래서 RHYTHM_DUPLICATE(보호자용 비즈니스
+	 * 에러)로 노출하지 않고 처리하지 못한 예외로 던져서 GlobalExceptionHandler가 500
+	 * 내부 오류로 바꾸고 로그를 남기게 한다(은솔님 PR #52 리뷰). rhythm이 아니라 pulses로
+	 * 비교해야 CUSTOM과 TEMPLATE(rhythm이 null일 수 있음)을 같은 기준으로 비교할 수 있다.
+	 * 여러 템플릿을 한 번에 넣는 도중 충돌이 나면 @Transactional이 그 호출에서 만든 것
+	 * 전부 롤백한다.
 	 */
 	private void ensurePulsesNotDuplicated(UUID linkId, SignalTemplate template) {
 		if (signalRepository.findByLinkIdAndPulses(linkId, template.getPulses(), null).isPresent()) {
-			throw new SonulimException(ErrorCode.RHYTHM_DUPLICATE, "같은 리듬의 신호가 이미 있어요");
+			throw new IllegalStateException(
+					"signal_templates 카탈로그에 같은 리듬의 템플릿이 있어요: " + template.getId());
 		}
 	}
 }
