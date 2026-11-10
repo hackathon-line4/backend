@@ -5,6 +5,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.sonulim.domain.signal.domain.RhythmBeat;
+import com.sonulim.domain.signal.domain.RhythmPreset;
+import com.sonulim.domain.signal.domain.RhythmPresetRepository;
 import com.sonulim.domain.signal.domain.Signal;
 import com.sonulim.domain.signal.domain.SignalCategory;
 import com.sonulim.domain.signal.domain.SignalRepository;
@@ -37,6 +39,9 @@ class SignalCommandServiceTest {
 	private SignalTemplateRepository signalTemplateRepository;
 
 	@Mock
+	private RhythmPresetRepository rhythmPresetRepository;
+
+	@Mock
 	private LinkAccessGuard linkAccessGuard;
 
 	private final UUID linkId = UUID.randomUUID();
@@ -45,15 +50,21 @@ class SignalCommandServiceTest {
 	private final String idempotencyKeyHeader = idempotencyKey.toString();
 
 	private SignalCommandService service() {
-		return new SignalCommandService(signalRepository, signalTemplateRepository, linkAccessGuard);
+		return new SignalCommandService(signalRepository, signalTemplateRepository, rhythmPresetRepository,
+				linkAccessGuard);
 	}
 
 	private static CreateSignalCommand customCommand(String name, SignalCategory category, List<String> rhythm) {
-		return new CreateSignalCommand(SignalSource.CUSTOM, null, name, null, category, "icon", rhythm);
+		return new CreateSignalCommand(SignalSource.CUSTOM, null, name, null, category, "icon", rhythm, null);
+	}
+
+	private static CreateSignalCommand customCommandWithPreset(String name, SignalCategory category,
+			List<String> rhythm, UUID presetId) {
+		return new CreateSignalCommand(SignalSource.CUSTOM, null, name, null, category, "icon", rhythm, presetId);
 	}
 
 	private static CreateSignalCommand templateCommand(UUID templateId) {
-		return new CreateSignalCommand(SignalSource.TEMPLATE, templateId, null, null, null, null, null);
+		return new CreateSignalCommand(SignalSource.TEMPLATE, templateId, null, null, null, null, null, null);
 	}
 
 	// ---- create: CUSTOM ----
@@ -80,7 +91,7 @@ class SignalCommandServiceTest {
 				.isInstanceOf(SonulimException.class)
 				.extracting(e -> ((SonulimException) e).getErrorCode())
 				.isEqualTo(ErrorCode.ROLE_MISMATCH);
-		verifyNoInteractions(linkAccessGuard, signalRepository, signalTemplateRepository);
+		verifyNoInteractions(linkAccessGuard, signalRepository, signalTemplateRepository, rhythmPresetRepository);
 	}
 
 	@Test
@@ -174,7 +185,7 @@ class SignalCommandServiceTest {
 				.isInstanceOf(SonulimException.class)
 				.extracting(e -> ((SonulimException) e).getErrorCode())
 				.isEqualTo(ErrorCode.IDEMPOTENCY_KEY_REQUIRED);
-		verifyNoInteractions(linkAccessGuard, signalRepository, signalTemplateRepository);
+		verifyNoInteractions(linkAccessGuard, signalRepository, signalTemplateRepository, rhythmPresetRepository);
 	}
 
 	@Test
@@ -186,6 +197,73 @@ class SignalCommandServiceTest {
 				.isInstanceOf(SonulimException.class)
 				.extracting(e -> ((SonulimException) e).getErrorCode())
 				.isEqualTo(ErrorCode.VALIDATION_FAILED);
+	}
+
+	// ---- create: CUSTOM with presetId (PRESET_IN_USE) ----
+
+	@Test
+	void createRejectsAPresetAlreadyUsedByAnExistingSignalInTheSameLink() {
+		SignalCommandService service = service();
+		UUID presetId = UUID.randomUUID();
+		RhythmPreset preset = new RhythmPreset(List.of(RhythmBeat.LONG, RhythmBeat.LONG));
+		Signal conflicting = org.mockito.Mockito.mock(Signal.class);
+		given(conflicting.getId()).willReturn(UUID.randomUUID());
+		given(conflicting.getName()).willReturn("가자");
+		given(rhythmPresetRepository.findById(presetId)).willReturn(Optional.of(preset));
+		given(signalRepository.findByLinkIdAndRhythm(linkId, List.of(RhythmBeat.LONG, RhythmBeat.LONG), null))
+				.willReturn(Optional.of(conflicting));
+
+		assertThatThrownBy(() -> service.create(linkId, requesterId, "GUARDIAN", idempotencyKeyHeader,
+				customCommandWithPreset("새 신호", SignalCategory.CHECK, List.of("LONG", "LONG"), presetId)))
+				.isInstanceOf(SonulimException.class)
+				.satisfies(e -> {
+					SonulimException exception = (SonulimException) e;
+					assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.PRESET_IN_USE);
+					assertThat(exception.getField()).isEqualTo("presetId");
+					@SuppressWarnings("unchecked")
+					var conflictSignal = (java.util.Map<String, Object>) exception.getDetails().get("conflictSignal");
+					assertThat(conflictSignal).containsEntry("name", "가자");
+				});
+		verify(signalRepository, never()).save(any());
+	}
+
+	@Test
+	void createAllowsAPresetNotUsedByAnyExistingSignal() {
+		SignalCommandService service = service();
+		UUID presetId = UUID.randomUUID();
+		RhythmPreset preset = new RhythmPreset(List.of(RhythmBeat.LONG, RhythmBeat.LONG));
+		given(rhythmPresetRepository.findById(presetId)).willReturn(Optional.of(preset));
+		given(signalRepository.save(any())).willAnswer(invocation -> invocation.getArgument(0));
+
+		Signal result = service.create(linkId, requesterId, "GUARDIAN", idempotencyKeyHeader,
+				customCommandWithPreset("새 신호", SignalCategory.CHECK, List.of("LONG", "LONG"), presetId));
+
+		assertThat(result.getName()).isEqualTo("새 신호");
+	}
+
+	@Test
+	void createReturnsNotFoundWhenThePresetDoesNotExist() {
+		SignalCommandService service = service();
+		UUID presetId = UUID.randomUUID();
+		given(rhythmPresetRepository.findById(presetId)).willReturn(Optional.empty());
+
+		assertThatThrownBy(() -> service.create(linkId, requesterId, "GUARDIAN", idempotencyKeyHeader,
+				customCommandWithPreset("새 신호", SignalCategory.CHECK, List.of("LONG", "LONG"), presetId)))
+				.isInstanceOf(SonulimException.class)
+				.extracting(e -> ((SonulimException) e).getErrorCode())
+				.isEqualTo(ErrorCode.NOT_FOUND);
+		verify(signalRepository, never()).save(any());
+	}
+
+	@Test
+	void createSkipsPresetCheckWhenNoPresetIdIsGiven() {
+		SignalCommandService service = service();
+		given(signalRepository.save(any())).willAnswer(invocation -> invocation.getArgument(0));
+
+		service.create(linkId, requesterId, "GUARDIAN", idempotencyKeyHeader,
+				customCommand("이름", SignalCategory.CHECK, List.of("SHORT", "LONG")));
+
+		verifyNoInteractions(rhythmPresetRepository);
 	}
 
 	// ---- create: TEMPLATE (M-2) ----

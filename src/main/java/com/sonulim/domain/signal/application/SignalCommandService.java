@@ -6,6 +6,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.sonulim.domain.signal.domain.RhythmBeat;
+import com.sonulim.domain.signal.domain.RhythmPreset;
+import com.sonulim.domain.signal.domain.RhythmPresetRepository;
 import com.sonulim.domain.signal.domain.Signal;
 import com.sonulim.domain.signal.domain.SignalRepository;
 import com.sonulim.domain.signal.domain.SignalTemplate;
@@ -21,12 +23,14 @@ public class SignalCommandService {
 
 	private final SignalRepository signalRepository;
 	private final SignalTemplateRepository signalTemplateRepository;
+	private final RhythmPresetRepository rhythmPresetRepository;
 	private final LinkAccessGuard linkAccessGuard;
 
 	public SignalCommandService(SignalRepository signalRepository, SignalTemplateRepository signalTemplateRepository,
-			LinkAccessGuard linkAccessGuard) {
+			RhythmPresetRepository rhythmPresetRepository, LinkAccessGuard linkAccessGuard) {
 		this.signalRepository = signalRepository;
 		this.signalTemplateRepository = signalTemplateRepository;
+		this.rhythmPresetRepository = rhythmPresetRepository;
 		this.linkAccessGuard = linkAccessGuard;
 	}
 
@@ -65,9 +69,26 @@ public class SignalCommandService {
 			throw SonulimException.forField(ErrorCode.VALIDATION_FAILED, "카테고리를 선택해 주세요", "category");
 		}
 		List<RhythmBeat> rhythm = RhythmBeat.parseAll(command.rhythm());
+		if (command.presetId() != null) {
+			ensurePresetNotInUse(linkId, command.presetId());
+		}
 		ensureRhythmNotDuplicated(linkId, rhythm, null);
 		return Signal.createCustom(linkId, command.name(), command.description(), command.category(),
 				command.icon(), rhythm);
+	}
+
+	/**
+	 * usedBy(GET /rhythm-presets)와 동일한 "이미 사용 중" 판정 기준을 쓴다 — 둘 다
+	 * SignalRepository.findByLinkIdAndRhythm로 리듬이 겹치는 신호가 있는지를 본다.
+	 */
+	private void ensurePresetNotInUse(UUID linkId, UUID presetId) {
+		RhythmPreset preset = rhythmPresetRepository.findById(presetId)
+				.orElseThrow(() -> new SonulimException(ErrorCode.NOT_FOUND, "리듬 프리셋을 찾을 수 없어요"));
+		signalRepository.findByLinkIdAndRhythm(linkId, preset.getRhythm(), null).ifPresent(conflicting -> {
+			throw new SonulimException(ErrorCode.PRESET_IN_USE,
+					"'" + conflicting.getName() + "' 신호가 쓰는 리듬이에요", "presetId",
+					Map.of("conflictSignal", Map.of("id", conflicting.getId(), "name", conflicting.getName())));
+		});
 	}
 
 	/**
