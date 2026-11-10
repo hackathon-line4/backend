@@ -29,6 +29,7 @@ import com.sonulim.domain.link.domain.LinkRequestStatus;
 import com.sonulim.global.exception.ErrorCode;
 import com.sonulim.global.exception.SonulimException;
 import com.sonulim.global.security.AuthenticatedUser;
+import com.sonulim.global.signalseed.DefaultSignalSeeder;
 
 /**
  * 연결 요청 흐름: 당사자의 요청 보내기·취소·조회(L-2), 보호자의 받은 요청 목록·승인·거절(L-3).
@@ -48,17 +49,20 @@ public class LinkRequestService {
 	private final LinkCodeChecker linkCodeChecker;
 	private final ActiveLinkChecker activeLinkChecker;
 	private final UserRepository userRepository;
+	private final DefaultSignalSeeder defaultSignalSeeder;
 	private final Clock clock;
 
 	public LinkRequestService(LinkRequestRepository linkRequestRepository, LinkRepository linkRepository,
 			LinkCodeRepository linkCodeRepository, LinkCodeChecker linkCodeChecker,
-			ActiveLinkChecker activeLinkChecker, UserRepository userRepository, Clock clock) {
+			ActiveLinkChecker activeLinkChecker, UserRepository userRepository,
+			DefaultSignalSeeder defaultSignalSeeder, Clock clock) {
 		this.linkRequestRepository = linkRequestRepository;
 		this.linkRepository = linkRepository;
 		this.linkCodeRepository = linkCodeRepository;
 		this.linkCodeChecker = linkCodeChecker;
 		this.activeLinkChecker = activeLinkChecker;
 		this.userRepository = userRepository;
+		this.defaultSignalSeeder = defaultSignalSeeder;
 		this.clock = clock;
 	}
 
@@ -128,8 +132,9 @@ public class LinkRequestService {
 	}
 
 	/**
-	 * 한 트랜잭션에서 요청 확인 → 연결 생성 → 요청 APPROVED → 코드 used_at.
-	 * 기본 신호 세트 복사·자주 쓰는 신호 채우기는 signal 도메인이 생기면 붙인다(docs/domains/link.md Pending Decisions).
+	 * 한 트랜잭션에서 요청 확인 → 연결 생성 → 기본 신호 채우기 → 요청 APPROVED → 코드 used_at.
+	 * 기본 신호는 signal 도메인이 global.signalseed.DefaultSignalSeeder로 채운다(#78). 같은 트랜잭션이라 둘 중 하나가
+	 * 실패하면 함께 롤백된다. 자주 쓰는 신호 채우기는 아직 미정(docs/domains/link.md Pending Decisions).
 	 */
 	@Transactional
 	public LinkRequestDetails approve(AuthenticatedUser user, String requestId) {
@@ -146,6 +151,7 @@ public class LinkRequestService {
 			// 그사이 같은 보호자·당사자의 다른 연결이 먼저 만들어진 경우
 			throw ActiveLinkChecker.alreadyLinked();
 		}
+		defaultSignalSeeder.seedDefaults(link.getId());
 		request.approve(link.getId(), now);
 		linkCodeRepository.findById(request.getLinkCodeId()).ifPresent(linkCode -> linkCode.markUsed(now));
 		return new LinkRequestDetails(request, user(request.getGuardianId()), user(request.getRecipientId()), link);
