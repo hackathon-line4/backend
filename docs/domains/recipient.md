@@ -28,6 +28,7 @@
   - `followingMessages`는 요청 이후 보호자가 보낸 신호를 **다음 도움 요청 전까지** 최대 20건 준다. 그 뒤 신호는 다음 요청에 딸린 대화라 끊는다
   - messaging 조회는 `MessageQueryService.sentBetween`을 거친다 — 권한은 부르는 쪽이 이미 확인했으므로 거기서 다시 묻지 않는다. 연습(`PRACTICE`)은 주고받은 신호가 아니라 제외한다
 
+- 도움 요청 첫 열람에 당사자에게 `HELP_CONFIRMED` 푸시를 보낸다 (#71). **첫 열람에서만** — 상세를 다시 열 때마다 '확인함' 진동이 울리면 안 된다
 - 위치 붙이기 `PUT /help-requests/{id}/location` (#69). 요청을 보낸 당사자 본인만, 남의 요청이면 404
   - 도움 요청이 위치를 기다리느라 늦어지면 안 되므로 `PENDING`으로 먼저 보내고 얻는 대로 여기서 채운다
   - `PENDING`일 때만 가능하고 한 번 정해지면 `LOCATION_ALREADY_SET`. 받는 상태는 `ATTACHED`/`UNAVAILABLE` 둘뿐이다 — `NOT_SHARED`는 요청을 만들 때 서버가 판단하는 값이라 여기서 받지 않는다
