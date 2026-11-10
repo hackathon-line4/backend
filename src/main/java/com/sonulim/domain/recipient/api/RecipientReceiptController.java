@@ -9,11 +9,13 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.sonulim.domain.recipient.application.HelpRequestLocationService;
 import com.sonulim.domain.recipient.application.HelpRequestQueryService;
 import com.sonulim.domain.recipient.application.RecipientReceiptService;
 import com.sonulim.global.OpenApiConfig;
@@ -32,11 +34,26 @@ public class RecipientReceiptController {
 
 	private final RecipientReceiptService recipientReceiptService;
 	private final HelpRequestQueryService helpRequestQueryService;
+	private final HelpRequestLocationService helpRequestLocationService;
 
 	public RecipientReceiptController(RecipientReceiptService recipientReceiptService,
-			HelpRequestQueryService helpRequestQueryService) {
+			HelpRequestQueryService helpRequestQueryService,
+			HelpRequestLocationService helpRequestLocationService) {
 		this.recipientReceiptService = recipientReceiptService;
 		this.helpRequestQueryService = helpRequestQueryService;
+		this.helpRequestLocationService = helpRequestLocationService;
+	}
+
+	@Operation(summary = "도움 요청에 위치 붙이기", description = "R-3 · 당사자만(요청한 사람). "
+			+ "위치를 기다리느라 요청이 늦어지지 않도록 PENDING으로 먼저 보낸 뒤 위치를 얻는 대로 붙인다. "
+			+ "PENDING일 때만 가능하고 한 번 정해지면 409 LOCATION_ALREADY_SET. "
+			+ "권한 거부·측위 실패면 좌표 없이 UNAVAILABLE을 보낸다. 주소는 서버가 나중에 채운다")
+	@PutMapping("/help-requests/{id}/location")
+	public ApiResponse<HelpRequestResponse> attachLocation(@AuthenticationPrincipal AuthenticatedUser user,
+			@PathVariable UUID id, @Valid @RequestBody AttachLocationRequest request) {
+		HelpRequestLocationService.AttachedLocation attached = helpRequestLocationService.attach(
+				user, id, request.locationStatus(), request.toCapturedLocation());
+		return ApiResponse.success(HelpRequestResponse.of(attached.helpRequest(), attached.sender()));
 	}
 
 	@Operation(summary = "도움 요청 상세", description = "H-3 · 보호자만. 당사자가 보냄 → 내 휴대폰에 도착 → "
