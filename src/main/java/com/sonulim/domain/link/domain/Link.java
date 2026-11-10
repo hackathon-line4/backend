@@ -55,6 +55,15 @@ public class Link extends BaseEntity {
 	@Column(unique = true)
 	private UUID activeRecipientId;
 
+	// 연결 확인(T-2) 결과. 이 컬럼보다 먼저 만들어진 연결 행은 null이라 nullable로 두고 null은 UNKNOWN으로 읽는다
+	// (NOT NULL 컬럼을 추가하면 기존 행이 있는 DB에서 ddl-auto: update가 실패한다).
+	@Enumerated(EnumType.STRING)
+	@Column(length = 20)
+	private ConnectionState connectionState;
+
+	// 상대 앱이 마지막으로 ack를 보낸 시각. 타임아웃 뒤에 온 ack도 반영한다(명세).
+	private LocalDateTime lastConfirmedAt;
+
 	protected Link() {
 	}
 
@@ -65,6 +74,47 @@ public class Link extends BaseEntity {
 		this.linkedAt = now;
 		this.activeGuardianId = guardianId;
 		this.activeRecipientId = recipientId;
+		this.connectionState = ConnectionState.UNKNOWN;
+	}
+
+	public boolean isActive() {
+		return status == LinkStatus.ACTIVE;
+	}
+
+	public boolean involves(UUID userId) {
+		return guardianId.equals(userId) || recipientId.equals(userId);
+	}
+
+	/**
+	 * 타임아웃 안에 ack가 왔다.
+	 */
+	public void connectionConfirmed(LocalDateTime ackedAt) {
+		this.connectionState = ConnectionState.CONFIRMED;
+		connectionSeenAt(ackedAt);
+	}
+
+	/**
+	 * 타임아웃 안에 ack가 오지 않았다.
+	 */
+	public void connectionUnconfirmed() {
+		this.connectionState = ConnectionState.UNCONFIRMED;
+	}
+
+	/**
+	 * 타임아웃 뒤에 온 ack. 상태는 그대로 두고 마지막 확인 시각만 갱신한다(명세 해석, Pending Decisions).
+	 */
+	public void connectionSeenAt(LocalDateTime ackedAt) {
+		if (lastConfirmedAt == null || ackedAt.isAfter(lastConfirmedAt)) {
+			this.lastConfirmedAt = ackedAt;
+		}
+	}
+
+	public ConnectionState getConnectionState() {
+		return connectionState != null ? connectionState : ConnectionState.UNKNOWN;
+	}
+
+	public LocalDateTime getLastConfirmedAt() {
+		return lastConfirmedAt;
 	}
 
 	public static Link connect(UUID guardianId, UUID recipientId, LocalDateTime now) {
