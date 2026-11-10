@@ -21,6 +21,10 @@ sonulim:
     refresh-expiration-seconds: ${JWT_REFRESH_EXPIRATION_SECONDS:2592000}
   firebase:
     credentials-path: ${FIREBASE_CREDENTIALS_PATH:}
+  location:
+    # 시간이 지난 요청을 훑는 주기(ms). 요청 제한 시간(30초 제안)은 요청을 만들 때 정해지므로
+    # 생성 API가 들어올 때 설정으로 추가한다.
+    timeout-sweep-interval-ms: 5000
   idempotency:
     # 공통 규칙에 24시간으로 확정되어 있다.
     retention: 24h
