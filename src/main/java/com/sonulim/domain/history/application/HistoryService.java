@@ -91,6 +91,17 @@ public class HistoryService {
 		return new HistoryMonth(yearMonth, days);
 	}
 
+	/**
+	 * 홈 요약(link, #81)이 부르는 읽기. 역할·연결 접근 검사는 부르는 쪽이 이미 했다고 보고 여기서는 하지 않는다.
+	 */
+	public HomeRecords homeRecords(UUID linkId, UUID guardianId, int recentLimit) {
+		return new HomeRecords(
+				historyRecords.findLatest(linkId, guardianId, recentLimit),
+				historyRecords.findLatestUnopenedHelpRequest(linkId, guardianId).orElse(null),
+				historyRecords.findLatestGuardianSignal(linkId, guardianId).orElse(null),
+				historyRecords.findLatestRespondedSignal(linkId, guardianId).orElse(null));
+	}
+
 	private static LocalDateTime toUtc(LocalDate day, ZoneId zone) {
 		return day.atStartOfDay(zone).withZoneSameInstant(ZoneOffset.UTC).toLocalDateTime();
 	}
@@ -169,5 +180,15 @@ public class HistoryService {
 	}
 
 	public record CalendarDay(LocalDate date, int count, boolean hasNoResponse) {
+	}
+
+	/**
+	 * @param recent                    최신 기록(최신순)
+	 * @param latestUnopenedHelpRequest 보호자가 아직 열어 보지 않은 도움 요청 중 가장 최근 것, 없으면 null
+	 * @param latestGuardianSignal      가장 최근 보호자 신호(연습 제외), 없으면 null
+	 * @param latestRespondedSignal     응답 시각이 가장 최근인 응답 받은 보호자 신호, 없으면 null
+	 */
+	public record HomeRecords(List<HistoryItem> recent, HistoryItem latestUnopenedHelpRequest,
+			HistoryItem latestGuardianSignal, HistoryItem latestRespondedSignal) {
 	}
 }

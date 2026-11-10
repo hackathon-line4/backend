@@ -14,6 +14,7 @@
   - 달력: `month`(`YYYY-MM`) 필수(없거나 틀리면 400 `field=month`). 그 달에서 `tz` 기준 날짜별로 묶어 기록이 있는 날만 날짜순. `count`는 그날 전체 기록 수, `hasNoResponse`는 그날 `NO_RESPONSE` 보호자 신호가 하나라도 있으면 `true`. 미래 달은 빈 `days`.
   - **다른 도메인 읽기**: messaging·recipient를 읽는 곳은 `history.infrastructure.JpaHistoryRecords` 하나다. 그쪽 코드는 고치지 않고 엔티티를 JPQL로 읽기만 한다(그쪽 Repository에 기록 조회 메서드가 없음). 나머지 history 계층은 `history.domain.HistoryItem`(자체 읽기 모델)만 쓴다. 상태 enum은 switch로 옮겨서 그쪽에 값이 늘면 컴파일 오류가 난다. `Message`의 타임라인(LAZY)은 읽지 않는다.
   - 역할 확인은 link·settings와 같은 방식으로 `history.application.RoleRequirement`에 둔다(공통화는 팀 결정 후).
+- **홈 요약용 읽기 (#81)** — link의 홈 요약(S-4)이 부르는 `HistoryService.homeRecords(linkId, guardianId, limit)`: 최신 기록 N건, 열어 보지 않은 가장 최근 도움 요청, 가장 최근 보호자 신호(연습 제외), 응답 시각이 가장 최근인 응답 받은 보호자 신호. 역할·연결 접근 검사는 부르는 쪽(link)이 한다. `HistoryItemResponse.from`은 같은 모양을 쓰도록 public.
 
 ### 후속 작업 (해당 기능 구현 시)
 

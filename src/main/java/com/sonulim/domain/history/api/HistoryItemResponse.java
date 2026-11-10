@@ -16,7 +16,8 @@ public record HistoryItemResponse(UUID id, HistoryKind kind, String title, Strin
 		LocalDateTime occurredAt, Delivery delivery, Response response, LocalDateTime openedAt,
 		SummaryStatus summaryStatus, boolean canResend) {
 
-	static HistoryItemResponse from(HistoryItem item) {
+	// 홈 요약(link, #81)의 recentActivities도 같은 모양으로 쓴다.
+	public static HistoryItemResponse from(HistoryItem item) {
 		Response response = item.responseStatus() == null
 				? null
 				: new Response(item.responseStatus(), item.respondedAt());
