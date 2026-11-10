@@ -9,6 +9,7 @@ import com.sonulim.domain.signal.domain.SignalRepository;
 import com.sonulim.domain.signal.domain.SignalTemplate;
 import com.sonulim.domain.signal.domain.SignalTemplateRepository;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -33,6 +34,12 @@ class SignalTemplateSeederIntegrationTest {
 	@Autowired
 	private SignalRepository signalRepository;
 
+	/**
+	 * SignalTemplateCatalogSeeder(ApplicationRunner)가 공유 테스트 컨텍스트 기동 시 기본
+	 * 신호 6종을 이미 넣어둔 상태일 수 있다 — @AfterEach만으로는 이 테스트가 먼저 실행될 때
+	 * 그 6개까지 같이 보게 된다(실행 순서 의존). 시작 전에도 비워서 순서와 무관하게 만든다.
+	 */
+	@BeforeEach
 	@AfterEach
 	void cleanUp() {
 		signalRepository.deleteAll();
