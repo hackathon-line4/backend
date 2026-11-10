@@ -76,7 +76,7 @@ class MessageQueryApiIntegrationTest {
 	private Message sent(MessageKind kind, SignalCategory category) {
 		return messageRepository.save(Message.send(linkId, guardian.getId(), recipient.getId(), kind,
 				new SignalSnapshot(UUID.randomUUID(), "약 먹을 시간", "저녁 약을 먹자는 뜻", category, "pill",
-						List.of("SHORT", "SHORT", "LONG"), 1900),
+						List.of("SHORT", "SHORT", "LONG"), List.of(150, 150, 150, 150, 1000), 1900),
 				LocalDateTime.now().minusMinutes(1), Duration.ofSeconds(60)));
 	}
 
@@ -99,6 +99,32 @@ class MessageQueryApiIntegrationTest {
 				.andExpect(jsonPath("$.data.items[0].playbackPolicy", hasKey("repeatIntervalSec")))
 				.andExpect(jsonPath("$.data.items[0].playbackPolicy.repeatIntervalSec").value(nullValue()))
 				.andExpect(jsonPath("$.data.items[0].playbackPolicy.bypassDnd").value(false));
+	}
+
+	@Test
+	void aTemplateSignalWithNoRhythmStillCarriesWhatTheDeviceVibratesWith() throws Exception {
+		// 기본 신호는 불규칙한 쉼이 있어 SHORT/MEDIUM/LONG으로 담기지 않는다 — rhythm이 null이다.
+		// 기기는 pulses를 보고 울리므로 이게 비면 신호가 당사자에게 전달되지 않는다.
+		messageRepository.save(Message.send(linkId, guardian.getId(), recipient.getId(), MessageKind.SIGNAL,
+				new SignalSnapshot(UUID.randomUUID(), "가자", "같이 나가자는 뜻", SignalCategory.OUTING, "walk",
+						null, List.of(150, 150, 700, 400, 1000), 2400),
+				LocalDateTime.now().minusMinutes(1), Duration.ofSeconds(60)));
+
+		incoming(recipientToken)
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.items[0].signal.rhythm").value(nullValue()))
+				.andExpect(jsonPath("$.data.items[0].signal.pulses", hasSize(5)))
+				.andExpect(jsonPath("$.data.items[0].signal.pulses[0]").value(150))
+				.andExpect(jsonPath("$.data.items[0].signal.durationMs").value(2400));
+	}
+
+	@Test
+	void aSignalWithARhythmCarriesBoth() throws Exception {
+		sent(MessageKind.SIGNAL, SignalCategory.DAILY);
+
+		incoming(recipientToken)
+				.andExpect(jsonPath("$.data.items[0].signal.rhythm", hasSize(3)))
+				.andExpect(jsonPath("$.data.items[0].signal.pulses", hasSize(5)));
 	}
 
 	@Test

@@ -85,7 +85,7 @@ class HelpRequestDetailApiIntegrationTest {
 	private Message signalAt(String name, LocalDateTime sentAt) {
 		return messageRepository.save(Message.send(linkId, guardian.getId(), recipient.getId(), MessageKind.SIGNAL,
 				new SignalSnapshot(UUID.randomUUID(), name, null, SignalCategory.DAILY, "pill",
-						List.of("SHORT"), 500),
+						List.of("SHORT"), List.of(150), 500),
 				sentAt, Duration.ofSeconds(60)));
 	}
 

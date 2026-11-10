@@ -25,7 +25,7 @@ class MessageTest {
 
 	private static SignalSnapshot snapshot(SignalCategory category) {
 		return new SignalSnapshot(UUID.randomUUID(), "약 먹을 시간", "저녁 약을 먹자는 뜻",
-				category, "pill", List.of("SHORT", "SHORT", "LONG"), 1900);
+				category, "pill", List.of("SHORT", "SHORT", "LONG"), List.of(150, 150, 150, 150, 1000), 1900);
 	}
 
 	private static Message sent(MessageKind kind, SignalCategory category) {
@@ -302,7 +302,7 @@ class MessageTest {
 	void resendCopiesTheLinkAndPointsAtTheOriginalWithAFreshSnapshot() {
 		Message original = sent();
 		SignalSnapshot renamed = new SignalSnapshot(original.getSignalSnapshot().signalId(),
-				"이름이 바뀐 신호", "설명도 바뀜", SignalCategory.DAILY, "pill", List.of("LONG", "LONG"), 2100);
+				"이름이 바뀐 신호", "설명도 바뀜", SignalCategory.DAILY, "pill", List.of("LONG", "LONG"), List.of(1000, 150, 1000), 2100);
 
 		Message resent = Message.resend(original, renamed, SENT_AT.plusMinutes(12), ACK_TIMEOUT);
 

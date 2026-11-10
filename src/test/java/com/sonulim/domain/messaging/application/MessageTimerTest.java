@@ -54,7 +54,7 @@ class MessageTimerTest {
 		Message message = Message.send(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
 				MessageKind.SIGNAL,
 				new SignalSnapshot(UUID.randomUUID(), "약 먹을 시간", null, category, "pill",
-						List.of("SHORT", "SHORT", "LONG"), 1900),
+						List.of("SHORT", "SHORT", "LONG"), List.of(150, 150, 150, 150, 1000), 1900),
 				sentAt, ackTimeout);
 		return messageRepository.save(message);
 	}

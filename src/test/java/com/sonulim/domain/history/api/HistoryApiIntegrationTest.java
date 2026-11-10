@@ -365,7 +365,7 @@ class HistoryApiIntegrationTest {
 
 	private static SignalSnapshot snapshot() {
 		return new SignalSnapshot(UUID.randomUUID(), "약 먹을 시간", "저녁 약을 먹자는 뜻", SignalCategory.DAILY, "pill",
-				List.of("SHORT", "SHORT", "LONG"), 1900);
+				List.of("SHORT", "SHORT", "LONG"), List.of(150, 150, 150, 150, 1000), 1900);
 	}
 
 	// 한국 시각 → 저장 기준인 UTC LocalDateTime
