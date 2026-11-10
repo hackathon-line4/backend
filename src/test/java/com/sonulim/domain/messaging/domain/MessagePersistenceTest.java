@@ -27,7 +27,7 @@ class MessagePersistenceTest {
 	@Test
 	void signalSnapshotSurvivesARoundTripThroughTheJsonColumn() {
 		SignalSnapshot snapshot = new SignalSnapshot(UUID.randomUUID(), "약 먹을 시간", "저녁 약을 먹자는 뜻",
-				SignalCategory.DAILY, "pill", List.of("SHORT", "SHORT", "LONG"), 1900);
+				SignalCategory.DAILY, "pill", List.of("SHORT", "SHORT", "LONG"), List.of(150, 150, 150, 150, 1000), 1900);
 		Message message = Message.send(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
 				MessageKind.SIGNAL, snapshot, LocalDateTime.now(), Duration.ofSeconds(60));
 
@@ -47,7 +47,7 @@ class MessagePersistenceTest {
 		Message message = Message.send(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
 				MessageKind.SIGNAL,
 				new SignalSnapshot(UUID.randomUUID(), "위험해", null, SignalCategory.EMERGENCY, "siren",
-						List.of("LONG", "LONG", "LONG"), 3300),
+						List.of("LONG", "LONG", "LONG"), List.of(1000, 150, 1000, 150, 1000), 3300),
 				LocalDateTime.now(), Duration.ofSeconds(60));
 		entityManager.persist(message);
 
