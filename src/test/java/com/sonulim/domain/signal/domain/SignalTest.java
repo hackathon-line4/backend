@@ -13,12 +13,12 @@ class SignalTest {
 
 	@Test
 	void calculatesDurationAsBeatsPlusGapsBetweenThemMatchingTheCommonDataFormatExample() {
-		// 공통 데이터 형식 문서 예시: rhythm ["SHORT","SHORT","LONG"] -> durationMs 1900
-		// 200(SHORT) + 300(간격) + 200(SHORT) + 300(간격) + 900(LONG) = 1900, 마지막 뒤 간격 없음
+		// 촉신호 -> 진동 변환 규칙 문서: rhythm ["SHORT","SHORT","LONG"] -> durationMs 1600
+		// 150(SHORT) + 150(간격) + 150(SHORT) + 150(간격) + 1000(LONG) = 1600, 마지막 뒤 간격 없음
 		Signal signal = Signal.createCustom(LINK_ID, "약 먹을 시간", "저녁 약을 먹자는 뜻",
 				SignalCategory.DAILY, "pill", List.of(RhythmBeat.SHORT, RhythmBeat.SHORT, RhythmBeat.LONG));
 
-		assertThat(signal.calculateDurationMs()).isEqualTo(1900);
+		assertThat(signal.calculateDurationMs()).isEqualTo(1600);
 	}
 
 	@Test
@@ -26,7 +26,35 @@ class SignalTest {
 		Signal signal = Signal.createCustom(LINK_ID, "두 박자", null, SignalCategory.CHECK, "icon",
 				List.of(RhythmBeat.SHORT, RhythmBeat.SHORT));
 
-		assertThat(signal.calculateDurationMs()).isEqualTo(200 + 300 + 200);
+		assertThat(signal.calculateDurationMs()).isEqualTo(150 + 150 + 150);
+	}
+
+	@Test
+	void customSignalPulsesAreComputedFromRhythm() {
+		Signal signal = Signal.createCustom(LINK_ID, "약 먹을 시간", null, SignalCategory.DAILY, "pill",
+				List.of(RhythmBeat.LONG, RhythmBeat.SHORT, RhythmBeat.MEDIUM));
+
+		assertThat(signal.getPulses()).containsExactly(1000, 150, 150, 150, 700);
+	}
+
+	@Test
+	void updatingRhythmRecomputesPulses() {
+		Signal signal = Signal.createCustom(LINK_ID, "이름", null, SignalCategory.CHECK, "icon",
+				List.of(RhythmBeat.SHORT, RhythmBeat.SHORT));
+
+		signal.updateRhythm(List.of(RhythmBeat.LONG, RhythmBeat.LONG));
+
+		assertThat(signal.getPulses()).containsExactly(1000, 150, 1000);
+	}
+
+	@Test
+	void templateSourcedSignalCopiesRhythmAndPulsesFromTheTemplate() {
+		Signal signal = Signal.fromTemplate(LINK_ID, UUID.randomUUID(), "가자", "함께 이동하자는 뜻",
+				SignalCategory.OUTING, "walk", null, List.of(150, 150, 150, 150, 150, 150, 150));
+
+		assertThat(signal.getRhythm()).isNull();
+		assertThat(signal.getPulses()).containsExactly(150, 150, 150, 150, 150, 150, 150);
+		assertThat(signal.calculateDurationMs()).isEqualTo(1050);
 	}
 
 	@Test

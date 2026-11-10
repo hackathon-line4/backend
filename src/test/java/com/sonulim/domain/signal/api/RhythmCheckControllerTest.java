@@ -51,7 +51,7 @@ class RhythmCheckControllerTest {
 						.content(body))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data.valid").value(true))
-				.andExpect(jsonPath("$.data.durationMs").value(1400))
+				.andExpect(jsonPath("$.data.durationMs").value(1300))
 				.andExpect(jsonPath("$.data.conflictSignal").doesNotExist());
 	}
 

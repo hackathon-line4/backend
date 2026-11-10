@@ -81,25 +81,25 @@ class SignalRepositoryTest {
 	}
 
 	@Test
-	void findsTheSignalWithAMatchingRhythmInTheSameLink() {
+	void findsTheSignalWithAMatchingPulsesInTheSameLink() {
 		UUID linkId = UUID.randomUUID();
 		Signal signal = entityManager.persistAndFlush(
 				Signal.createCustom(linkId, "가자", null, SignalCategory.OUTING, "icon",
 						List.of(RhythmBeat.SHORT, RhythmBeat.LONG)));
 
-		var found = repository.findByLinkIdAndRhythm(linkId, List.of(RhythmBeat.SHORT, RhythmBeat.LONG), null);
+		var found = repository.findByLinkIdAndPulses(linkId, RhythmBeat.toPulses(List.of(RhythmBeat.SHORT, RhythmBeat.LONG)), null);
 
 		assertThat(found).contains(signal);
 	}
 
 	@Test
-	void excludesTheGivenIdFromTheRhythmMatch() {
+	void excludesTheGivenIdFromThePulsesMatch() {
 		UUID linkId = UUID.randomUUID();
 		Signal signal = entityManager.persistAndFlush(
 				Signal.createCustom(linkId, "가자", null, SignalCategory.OUTING, "icon",
 						List.of(RhythmBeat.SHORT, RhythmBeat.LONG)));
 
-		var found = repository.findByLinkIdAndRhythm(linkId, List.of(RhythmBeat.SHORT, RhythmBeat.LONG),
+		var found = repository.findByLinkIdAndPulses(linkId, RhythmBeat.toPulses(List.of(RhythmBeat.SHORT, RhythmBeat.LONG)),
 				signal.getId());
 
 		assertThat(found).isEmpty();
@@ -127,7 +127,7 @@ class SignalRepositoryTest {
 				Signal.createCustom(linkId, "가자", null, SignalCategory.OUTING, "icon",
 						List.of(RhythmBeat.SHORT, RhythmBeat.LONG)));
 
-		var found = repository.findByLinkIdAndRhythm(linkId, List.of(RhythmBeat.LONG, RhythmBeat.LONG), null);
+		var found = repository.findByLinkIdAndPulses(linkId, RhythmBeat.toPulses(List.of(RhythmBeat.LONG, RhythmBeat.LONG)), null);
 
 		assertThat(found).isEmpty();
 	}
@@ -137,7 +137,8 @@ class SignalRepositoryTest {
 		UUID linkId = UUID.randomUUID();
 		UUID templateId = UUID.randomUUID();
 		entityManager.persistAndFlush(Signal.fromTemplate(linkId, templateId, "가자", null, SignalCategory.OUTING,
-				"walk", List.of(RhythmBeat.LONG, RhythmBeat.LONG)));
+				"walk", List.of(RhythmBeat.LONG, RhythmBeat.LONG),
+				RhythmBeat.toPulses(List.of(RhythmBeat.LONG, RhythmBeat.LONG))));
 
 		assertThat(repository.existsByLinkIdAndTemplateId(linkId, templateId)).isTrue();
 		assertThat(repository.existsByLinkIdAndTemplateId(linkId, UUID.randomUUID())).isFalse();
@@ -149,14 +150,14 @@ class SignalRepositoryTest {
 		UUID linkId = UUID.randomUUID();
 		UUID templateId = UUID.randomUUID();
 		Signal signal = Signal.fromTemplate(linkId, templateId, "가자", null, SignalCategory.OUTING, "walk",
-				List.of(RhythmBeat.LONG, RhythmBeat.LONG));
+				List.of(RhythmBeat.LONG, RhythmBeat.LONG), RhythmBeat.toPulses(List.of(RhythmBeat.LONG, RhythmBeat.LONG)));
 		signal.softDelete();
 		entityManager.persistAndFlush(signal);
 
 		assertThat(repository.existsByLinkIdAndTemplateIdAndDeletedAtIsNull(linkId, templateId)).isFalse();
 		// 삭제되지 않은 경우엔 true여야 재추가 차단(TEMPLATE_ALREADY_ADDED)이 실제로 동작한다.
 		Signal active = Signal.fromTemplate(linkId, UUID.randomUUID(), "밥 먹자", null, SignalCategory.DAILY, "meal",
-				List.of(RhythmBeat.SHORT, RhythmBeat.SHORT));
+				List.of(RhythmBeat.SHORT, RhythmBeat.SHORT), RhythmBeat.toPulses(List.of(RhythmBeat.SHORT, RhythmBeat.SHORT)));
 		entityManager.persistAndFlush(active);
 		assertThat(repository.existsByLinkIdAndTemplateIdAndDeletedAtIsNull(linkId, active.getTemplateId())).isTrue();
 	}

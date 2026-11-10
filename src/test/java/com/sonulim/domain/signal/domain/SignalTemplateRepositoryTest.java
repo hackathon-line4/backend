@@ -21,7 +21,7 @@ class SignalTemplateRepositoryTest {
 	@Test
 	void roundTripsRhythmAndFields() {
 		SignalTemplate template = new SignalTemplate("가자", "함께 이동하자는 뜻", SignalCategory.OUTING, "walk",
-				List.of(RhythmBeat.LONG, RhythmBeat.LONG));
+				List.of(RhythmBeat.LONG, RhythmBeat.LONG), RhythmBeat.toPulses(List.of(RhythmBeat.LONG, RhythmBeat.LONG)));
 
 		SignalTemplate saved = entityManager.persistFlushFind(template);
 		entityManager.clear();
@@ -30,5 +30,6 @@ class SignalTemplateRepositoryTest {
 		assertThat(reloaded.getName()).isEqualTo("가자");
 		assertThat(reloaded.getCategory()).isEqualTo(SignalCategory.OUTING);
 		assertThat(reloaded.getRhythm()).containsExactly(RhythmBeat.LONG, RhythmBeat.LONG);
+		assertThat(reloaded.getPulses()).containsExactly(1000, 150, 1000);
 	}
 }

@@ -42,9 +42,9 @@ class SignalTemplateSeederIntegrationTest {
 	@Test
 	void createsASignalForEveryTemplateInTheCatalog() {
 		signalTemplateRepository.saveAndFlush(new SignalTemplate("가자", "함께 이동하자는 뜻", SignalCategory.OUTING, "walk",
-				List.of(RhythmBeat.LONG, RhythmBeat.LONG)));
+				null, RhythmBeat.toPulses(List.of(RhythmBeat.LONG, RhythmBeat.LONG))));
 		signalTemplateRepository.saveAndFlush(new SignalTemplate("밥 먹자", "식사하러 오라는 뜻", SignalCategory.DAILY, "meal",
-				List.of(RhythmBeat.SHORT, RhythmBeat.SHORT)));
+				null, RhythmBeat.toPulses(List.of(RhythmBeat.SHORT, RhythmBeat.SHORT))));
 		UUID linkId = UUID.randomUUID();
 
 		seeder.seedDefaults(linkId);
@@ -55,8 +55,8 @@ class SignalTemplateSeederIntegrationTest {
 
 	@Test
 	void callingItAgainDoesNotCreateDuplicateSignals() {
-		signalTemplateRepository.saveAndFlush(new SignalTemplate("가자", null, SignalCategory.OUTING, "walk",
-				List.of(RhythmBeat.LONG, RhythmBeat.LONG)));
+		signalTemplateRepository.saveAndFlush(new SignalTemplate("가자", null, SignalCategory.OUTING, "walk", null,
+				RhythmBeat.toPulses(List.of(RhythmBeat.LONG, RhythmBeat.LONG))));
 		UUID linkId = UUID.randomUUID();
 		seeder.seedDefaults(linkId);
 
@@ -67,10 +67,10 @@ class SignalTemplateSeederIntegrationTest {
 
 	@Test
 	void rollsBackAllSignalsForThisLinkWhenATemplateRhythmCollisionIsHitMidway() {
-		signalTemplateRepository.saveAndFlush(new SignalTemplate("가자", null, SignalCategory.OUTING, "walk",
-				List.of(RhythmBeat.LONG, RhythmBeat.LONG)));
-		signalTemplateRepository.saveAndFlush(new SignalTemplate("같은 리듬", null, SignalCategory.CHECK, "icon",
-				List.of(RhythmBeat.LONG, RhythmBeat.LONG)));
+		signalTemplateRepository.saveAndFlush(new SignalTemplate("가자", null, SignalCategory.OUTING, "walk", null,
+				RhythmBeat.toPulses(List.of(RhythmBeat.LONG, RhythmBeat.LONG))));
+		signalTemplateRepository.saveAndFlush(new SignalTemplate("같은 리듬", null, SignalCategory.CHECK, "icon", null,
+				RhythmBeat.toPulses(List.of(RhythmBeat.LONG, RhythmBeat.LONG))));
 		UUID linkId = UUID.randomUUID();
 
 		assertThatThrownBy(() -> seeder.seedDefaults(linkId))

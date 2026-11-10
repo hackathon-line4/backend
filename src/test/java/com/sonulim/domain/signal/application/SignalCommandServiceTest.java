@@ -145,7 +145,7 @@ class SignalCommandServiceTest {
 		Signal existing = org.mockito.Mockito.mock(Signal.class);
 		given(existing.getId()).willReturn(conflictId);
 		given(existing.getName()).willReturn("기존");
-		given(signalRepository.findByLinkIdAndRhythm(linkId, List.of(RhythmBeat.SHORT, RhythmBeat.LONG), null))
+		given(signalRepository.findByLinkIdAndPulses(linkId, RhythmBeat.toPulses(List.of(RhythmBeat.SHORT, RhythmBeat.LONG)), null))
 				.willReturn(Optional.of(existing));
 
 		assertThatThrownBy(() -> service.create(linkId, requesterId, "GUARDIAN", idempotencyKeyHeader,
@@ -210,7 +210,7 @@ class SignalCommandServiceTest {
 		given(conflicting.getId()).willReturn(UUID.randomUUID());
 		given(conflicting.getName()).willReturn("가자");
 		given(rhythmPresetRepository.findById(presetId)).willReturn(Optional.of(preset));
-		given(signalRepository.findByLinkIdAndRhythm(linkId, List.of(RhythmBeat.LONG, RhythmBeat.LONG), null))
+		given(signalRepository.findByLinkIdAndPulses(linkId, RhythmBeat.toPulses(List.of(RhythmBeat.LONG, RhythmBeat.LONG)), null))
 				.willReturn(Optional.of(conflicting));
 
 		assertThatThrownBy(() -> service.create(linkId, requesterId, "GUARDIAN", idempotencyKeyHeader,
@@ -273,7 +273,7 @@ class SignalCommandServiceTest {
 		SignalCommandService service = service();
 		UUID templateId = UUID.randomUUID();
 		SignalTemplate template = new SignalTemplate("가자", "함께 이동하자는 뜻", SignalCategory.OUTING, "walk",
-				List.of(RhythmBeat.LONG, RhythmBeat.LONG));
+				List.of(RhythmBeat.LONG, RhythmBeat.LONG), RhythmBeat.toPulses(List.of(RhythmBeat.LONG, RhythmBeat.LONG)));
 		given(signalTemplateRepository.findById(templateId)).willReturn(Optional.of(template));
 		given(signalRepository.save(any())).willAnswer(invocation -> invocation.getArgument(0));
 
@@ -321,8 +321,8 @@ class SignalCommandServiceTest {
 	void createFromTemplateRejectsATemplateAlreadyAddedToThisLink() {
 		SignalCommandService service = service();
 		UUID templateId = UUID.randomUUID();
-		SignalTemplate template = new SignalTemplate("가자", null, SignalCategory.OUTING, "walk",
-				List.of(RhythmBeat.LONG, RhythmBeat.LONG));
+		SignalTemplate template = new SignalTemplate("가자", null, SignalCategory.OUTING, "walk", null,
+				RhythmBeat.toPulses(List.of(RhythmBeat.LONG, RhythmBeat.LONG)));
 		given(signalTemplateRepository.findById(templateId)).willReturn(Optional.of(template));
 		given(signalRepository.existsByLinkIdAndTemplateIdAndDeletedAtIsNull(linkId, templateId)).willReturn(true);
 
@@ -340,8 +340,8 @@ class SignalCommandServiceTest {
 		// 이 false(삭제된 것만 있음)이면 TEMPLATE_ALREADY_ADDED를 던지지 않아야 한다.
 		SignalCommandService service = service();
 		UUID templateId = UUID.randomUUID();
-		SignalTemplate template = new SignalTemplate("가자", null, SignalCategory.OUTING, "walk",
-				List.of(RhythmBeat.LONG, RhythmBeat.LONG));
+		SignalTemplate template = new SignalTemplate("가자", null, SignalCategory.OUTING, "walk", null,
+				RhythmBeat.toPulses(List.of(RhythmBeat.LONG, RhythmBeat.LONG)));
 		given(signalTemplateRepository.findById(templateId)).willReturn(Optional.of(template));
 		given(signalRepository.existsByLinkIdAndTemplateIdAndDeletedAtIsNull(linkId, templateId)).willReturn(false);
 		given(signalRepository.save(any())).willAnswer(invocation -> invocation.getArgument(0));
@@ -356,13 +356,13 @@ class SignalCommandServiceTest {
 	void createFromTemplateRejectsARhythmThatDuplicatesAnExistingSignalInTheSameLink() {
 		SignalCommandService service = service();
 		UUID templateId = UUID.randomUUID();
-		SignalTemplate template = new SignalTemplate("가자", null, SignalCategory.OUTING, "walk",
-				List.of(RhythmBeat.LONG, RhythmBeat.LONG));
+		SignalTemplate template = new SignalTemplate("가자", null, SignalCategory.OUTING, "walk", null,
+				RhythmBeat.toPulses(List.of(RhythmBeat.LONG, RhythmBeat.LONG)));
 		Signal conflicting = org.mockito.Mockito.mock(Signal.class);
 		given(conflicting.getId()).willReturn(UUID.randomUUID());
 		given(conflicting.getName()).willReturn("기존");
 		given(signalTemplateRepository.findById(templateId)).willReturn(Optional.of(template));
-		given(signalRepository.findByLinkIdAndRhythm(linkId, List.of(RhythmBeat.LONG, RhythmBeat.LONG), null))
+		given(signalRepository.findByLinkIdAndPulses(linkId, RhythmBeat.toPulses(List.of(RhythmBeat.LONG, RhythmBeat.LONG)), null))
 				.willReturn(Optional.of(conflicting));
 
 		assertThatThrownBy(() -> service.create(linkId, requesterId, "GUARDIAN", idempotencyKeyHeader,
@@ -433,7 +433,7 @@ class SignalCommandServiceTest {
 		given(other.getId()).willReturn(UUID.randomUUID());
 		given(other.getName()).willReturn("다른 신호");
 		given(signalRepository.findByIdAndDeletedAtIsNull(signalId)).willReturn(Optional.of(target));
-		given(signalRepository.findByLinkIdAndRhythm(linkId, List.of(RhythmBeat.LONG, RhythmBeat.LONG), null))
+		given(signalRepository.findByLinkIdAndPulses(linkId, RhythmBeat.toPulses(List.of(RhythmBeat.LONG, RhythmBeat.LONG)), null))
 				.willReturn(Optional.of(other));
 
 		assertThatThrownBy(() -> service.update(linkId, signalId, requesterId, "GUARDIAN",
@@ -477,7 +477,8 @@ class SignalCommandServiceTest {
 		SignalCommandService service = service();
 		UUID signalId = UUID.randomUUID();
 		Signal signal = Signal.fromTemplate(linkId, UUID.randomUUID(), "기본 신호", null,
-				SignalCategory.CHECK, "icon", List.of(RhythmBeat.SHORT, RhythmBeat.LONG));
+				SignalCategory.CHECK, "icon", List.of(RhythmBeat.SHORT, RhythmBeat.LONG),
+				RhythmBeat.toPulses(List.of(RhythmBeat.SHORT, RhythmBeat.LONG)));
 		given(signalRepository.findByIdAndDeletedAtIsNull(signalId)).willReturn(Optional.of(signal));
 
 		assertThatThrownBy(() -> service.update(linkId, signalId, requesterId, "GUARDIAN",

@@ -45,9 +45,9 @@ class SignalTemplateSeederTest {
 	@Test
 	void createsOneSignalPerTemplateNotYetSeededForThisLink() {
 		SignalTemplate template = new SignalTemplate("가자", "함께 이동하자는 뜻", SignalCategory.OUTING, "walk",
-				List.of(RhythmBeat.LONG, RhythmBeat.LONG));
+				List.of(RhythmBeat.LONG, RhythmBeat.LONG), RhythmBeat.toPulses(List.of(RhythmBeat.LONG, RhythmBeat.LONG)));
 		given(signalTemplateRepository.findAll()).willReturn(List.of(template));
-		given(signalRepository.findByLinkIdAndRhythm(any(), any(), any())).willReturn(Optional.empty());
+		given(signalRepository.findByLinkIdAndPulses(any(), any(), any())).willReturn(Optional.empty());
 
 		seeder().seedDefaults(linkId);
 
@@ -64,7 +64,7 @@ class SignalTemplateSeederTest {
 	@Test
 	void skipsATemplateAlreadySeededForThisLink() {
 		SignalTemplate template = new SignalTemplate("가자", null, SignalCategory.OUTING, "walk",
-				List.of(RhythmBeat.LONG, RhythmBeat.LONG));
+				List.of(RhythmBeat.LONG, RhythmBeat.LONG), RhythmBeat.toPulses(List.of(RhythmBeat.LONG, RhythmBeat.LONG)));
 		given(signalTemplateRepository.findAll()).willReturn(List.of(template));
 		given(signalRepository.existsByLinkIdAndTemplateId(eq(linkId), any())).willReturn(true);
 
@@ -91,11 +91,11 @@ class SignalTemplateSeederTest {
 	@Test
 	void treatsATemplateRhythmCollisionAsAnInternalErrorInsteadOfLeakingRhythmDuplicate() {
 		SignalTemplate template = new SignalTemplate("가자", null, SignalCategory.OUTING, "walk",
-				List.of(RhythmBeat.LONG, RhythmBeat.LONG));
+				List.of(RhythmBeat.LONG, RhythmBeat.LONG), RhythmBeat.toPulses(List.of(RhythmBeat.LONG, RhythmBeat.LONG)));
 		Signal conflicting = Signal.createCustom(linkId, "다른 이름", null, SignalCategory.CHECK, "icon",
 				List.of(RhythmBeat.LONG, RhythmBeat.LONG));
 		given(signalTemplateRepository.findAll()).willReturn(List.of(template));
-		given(signalRepository.findByLinkIdAndRhythm(linkId, List.of(RhythmBeat.LONG, RhythmBeat.LONG), null))
+		given(signalRepository.findByLinkIdAndPulses(linkId, RhythmBeat.toPulses(List.of(RhythmBeat.LONG, RhythmBeat.LONG)), null))
 				.willReturn(Optional.of(conflicting));
 
 		assertThatThrownBy(() -> seeder().seedDefaults(linkId))
@@ -116,10 +116,11 @@ class SignalTemplateSeederTest {
 		given(notYetSeeded.getCategory()).willReturn(SignalCategory.DAILY);
 		given(notYetSeeded.getIcon()).willReturn("meal");
 		given(notYetSeeded.getRhythm()).willReturn(List.of(RhythmBeat.SHORT, RhythmBeat.SHORT));
+		given(notYetSeeded.getPulses()).willReturn(RhythmBeat.toPulses(List.of(RhythmBeat.SHORT, RhythmBeat.SHORT)));
 		given(signalTemplateRepository.findAll()).willReturn(List.of(seeded, notYetSeeded));
 		given(signalRepository.existsByLinkIdAndTemplateId(linkId, seeded.getId())).willReturn(true);
 		given(signalRepository.existsByLinkIdAndTemplateId(linkId, notYetSeeded.getId())).willReturn(false);
-		given(signalRepository.findByLinkIdAndRhythm(any(), any(), any())).willReturn(Optional.empty());
+		given(signalRepository.findByLinkIdAndPulses(any(), any(), any())).willReturn(Optional.empty());
 
 		seeder().seedDefaults(linkId);
 

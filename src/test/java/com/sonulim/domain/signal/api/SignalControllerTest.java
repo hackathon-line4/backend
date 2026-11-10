@@ -85,7 +85,7 @@ class SignalControllerTest {
 				.andExpect(jsonPath("$.data.items[0].source").value("CUSTOM"))
 				.andExpect(jsonPath("$.data.items[0].category").value("DAILY"))
 				.andExpect(jsonPath("$.data.items[0].rhythm[0]").value("SHORT"))
-				.andExpect(jsonPath("$.data.items[0].durationMs").value(1900))
+				.andExpect(jsonPath("$.data.items[0].durationMs").value(1600))
 				.andExpect(jsonPath("$.data.items[0].practiced").value(false));
 	}
 
@@ -306,7 +306,8 @@ class SignalControllerTest {
 	void createFromTemplateCopiesTheTemplateAndReturns201() throws Exception {
 		UUID linkId = UUID.randomUUID();
 		var template = signalTemplateRepository.saveAndFlush(new com.sonulim.domain.signal.domain.SignalTemplate(
-				"가자", "함께 이동하자는 뜻", SignalCategory.OUTING, "walk", List.of(RhythmBeat.LONG, RhythmBeat.LONG)));
+				"가자", "함께 이동하자는 뜻", SignalCategory.OUTING, "walk", null,
+				RhythmBeat.toPulses(List.of(RhythmBeat.LONG, RhythmBeat.LONG))));
 		String body = objectMapper
 				.writeValueAsString(new CreateSignalRequest(SignalSource.TEMPLATE, template.getId(), null, null, null,
 						null, null, null));
@@ -328,9 +329,10 @@ class SignalControllerTest {
 	void createFromTemplateRejectsATemplateAlreadyAddedToThisLinkWith409() throws Exception {
 		UUID linkId = UUID.randomUUID();
 		var template = signalTemplateRepository.saveAndFlush(new com.sonulim.domain.signal.domain.SignalTemplate(
-				"가자", null, SignalCategory.OUTING, "walk", List.of(RhythmBeat.LONG, RhythmBeat.LONG)));
+				"가자", null, SignalCategory.OUTING, "walk", null,
+				RhythmBeat.toPulses(List.of(RhythmBeat.LONG, RhythmBeat.LONG))));
 		signalRepository.saveAndFlush(Signal.fromTemplate(linkId, template.getId(), "가자", null, SignalCategory.OUTING,
-				"walk", List.of(RhythmBeat.LONG, RhythmBeat.LONG)));
+				"walk", null, RhythmBeat.toPulses(List.of(RhythmBeat.LONG, RhythmBeat.LONG))));
 		String body = objectMapper
 				.writeValueAsString(new CreateSignalRequest(SignalSource.TEMPLATE, template.getId(), null, null, null,
 						null, null, null));
@@ -348,9 +350,10 @@ class SignalControllerTest {
 	void createFromTemplateAllowsReAddingAfterTheEarlierOneWasDeleted() throws Exception {
 		UUID linkId = UUID.randomUUID();
 		var template = signalTemplateRepository.saveAndFlush(new com.sonulim.domain.signal.domain.SignalTemplate(
-				"가자", null, SignalCategory.OUTING, "walk", List.of(RhythmBeat.LONG, RhythmBeat.LONG)));
-		Signal deleted = Signal.fromTemplate(linkId, template.getId(), "가자", null, SignalCategory.OUTING, "walk",
-				List.of(RhythmBeat.LONG, RhythmBeat.LONG));
+				"가자", null, SignalCategory.OUTING, "walk", null,
+				RhythmBeat.toPulses(List.of(RhythmBeat.LONG, RhythmBeat.LONG))));
+		Signal deleted = Signal.fromTemplate(linkId, template.getId(), "가자", null, SignalCategory.OUTING, "walk", null,
+				RhythmBeat.toPulses(List.of(RhythmBeat.LONG, RhythmBeat.LONG)));
 		deleted.softDelete();
 		signalRepository.saveAndFlush(deleted);
 		String body = objectMapper
@@ -385,7 +388,8 @@ class SignalControllerTest {
 			throws Exception {
 		UUID linkId = UUID.randomUUID();
 		var template = signalTemplateRepository.saveAndFlush(new com.sonulim.domain.signal.domain.SignalTemplate(
-				"가자", null, SignalCategory.OUTING, "walk", List.of(RhythmBeat.LONG, RhythmBeat.LONG)));
+				"가자", null, SignalCategory.OUTING, "walk", null,
+				RhythmBeat.toPulses(List.of(RhythmBeat.LONG, RhythmBeat.LONG))));
 		String token = bearerTokenFor(UUID.randomUUID());
 		String idempotencyKey = UUID.randomUUID().toString();
 		String body = objectMapper.writeValueAsString(
@@ -476,7 +480,8 @@ class SignalControllerTest {
 	void updateRejectsNameOrRhythmChangeOnATemplateSignal() throws Exception {
 		UUID linkId = UUID.randomUUID();
 		Signal templateSignal = signalRepository.saveAndFlush(Signal.fromTemplate(linkId, UUID.randomUUID(),
-				"기본 신호", null, SignalCategory.CHECK, "icon", List.of(RhythmBeat.SHORT, RhythmBeat.LONG)));
+				"기본 신호", null, SignalCategory.CHECK, "icon", null,
+				RhythmBeat.toPulses(List.of(RhythmBeat.SHORT, RhythmBeat.LONG))));
 		String body = objectMapper.writeValueAsString(
 				new UpdateSignalRequest("바꾼 이름", null, null, null, null));
 

@@ -58,8 +58,11 @@ public class Signal extends BaseEntity {
 	private String icon;
 
 	@Convert(converter = RhythmListConverter.class)
-	@Column(nullable = false)
 	private List<RhythmBeat> rhythm;
+
+	@Convert(converter = PulseListConverter.class)
+	@Column(nullable = false)
+	private List<Integer> pulses;
 
 	@Column(name = "practiced_at")
 	private LocalDateTime practicedAt;
@@ -74,7 +77,8 @@ public class Signal extends BaseEntity {
 	}
 
 	private Signal(UUID linkId, SignalSource source, UUID templateId, UUID presetId, String name,
-			String description, SignalCategory category, String icon, List<RhythmBeat> rhythm) {
+			String description, SignalCategory category, String icon, List<RhythmBeat> rhythm,
+			List<Integer> pulses) {
 		this.linkId = linkId;
 		this.source = source;
 		this.templateId = templateId;
@@ -83,17 +87,25 @@ public class Signal extends BaseEntity {
 		this.description = description;
 		this.category = category;
 		this.icon = icon;
-		this.rhythm = List.copyOf(rhythm);
+		this.rhythm = rhythm == null ? null : List.copyOf(rhythm);
+		this.pulses = List.copyOf(pulses);
 	}
 
 	public static Signal createCustom(UUID linkId, String name, String description, SignalCategory category,
 			String icon, List<RhythmBeat> rhythm) {
-		return new Signal(linkId, SignalSource.CUSTOM, null, null, name, description, category, icon, rhythm);
+		return new Signal(linkId, SignalSource.CUSTOM, null, null, name, description, category, icon, rhythm,
+				RhythmBeat.toPulses(rhythm));
 	}
 
+	/**
+	 * 기본 신호는 rhythm이 불규칙한 쉼을 가질 수 있어 SHORT/MEDIUM/LONG으로 못 담을 때가
+	 * 있다(촉신호 -> 진동 변환 규칙 문서) — 그래서 rhythm은 null일 수 있고, pulses를 템플릿이
+	 * 가진 값 그대로 복사한다.
+	 */
 	public static Signal fromTemplate(UUID linkId, UUID templateId, String name, String description,
-			SignalCategory category, String icon, List<RhythmBeat> rhythm) {
-		return new Signal(linkId, SignalSource.TEMPLATE, templateId, null, name, description, category, icon, rhythm);
+			SignalCategory category, String icon, List<RhythmBeat> rhythm, List<Integer> pulses) {
+		return new Signal(linkId, SignalSource.TEMPLATE, templateId, null, name, description, category, icon, rhythm,
+				pulses);
 	}
 
 	public void softDelete() {
@@ -124,6 +136,7 @@ public class Signal extends BaseEntity {
 	public void updateRhythm(List<RhythmBeat> rhythm) {
 		requireEditable();
 		this.rhythm = List.copyOf(rhythm);
+		this.pulses = RhythmBeat.toPulses(rhythm);
 	}
 
 	public void updateDescription(String description) {
@@ -145,11 +158,10 @@ public class Signal extends BaseEntity {
 	}
 
 	/**
-	 * 공통 데이터 형식 문서 기준: 박자 길이 합 + 박자 사이 간격(300ms) * (박자 수 - 1).
-	 * 마지막 박자 뒤에는 간격을 더하지 않는다 — 예시(SHORT,SHORT,LONG -> 1900ms)로 검증됨.
+	 * durationMs는 pulses 배열의 합이다(촉신호 -> 진동 변환 규칙 문서).
 	 */
 	public long calculateDurationMs() {
-		return RhythmBeat.totalDurationMs(rhythm);
+		return pulses.stream().mapToLong(Integer::longValue).sum();
 	}
 
 	public UUID getId() {
@@ -190,6 +202,10 @@ public class Signal extends BaseEntity {
 
 	public List<RhythmBeat> getRhythm() {
 		return rhythm;
+	}
+
+	public List<Integer> getPulses() {
+		return pulses;
 	}
 
 	public LocalDateTime getPracticedAt() {

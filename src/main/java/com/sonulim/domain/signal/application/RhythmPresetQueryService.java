@@ -3,6 +3,7 @@ package com.sonulim.domain.signal.application;
 import java.util.List;
 import java.util.UUID;
 
+import com.sonulim.domain.signal.domain.RhythmBeat;
 import com.sonulim.domain.signal.domain.RhythmPresetRepository;
 import com.sonulim.domain.signal.domain.SignalRepository;
 import com.sonulim.global.linkaccess.LinkAccessGuard;
@@ -10,8 +11,9 @@ import org.springframework.stereotype.Service;
 
 /**
  * M-3 "리듬 프리셋 목록" — GET /api/v1/rhythm-presets. usedBy는 POST/PATCH의
- * PRESET_IN_USE와 반드시 같은 기준(SignalRepository.findByLinkIdAndRhythm)을 써야
- * 한다 — 목록에서 "사용 가능"으로 보였는데 생성 시점엔 막히는 불일치가 없도록.
+ * PRESET_IN_USE와 반드시 같은 기준(SignalRepository.findByLinkIdAndPulses)을 써야
+ * 한다 — 목록에서 "사용 가능"으로 보였는데 생성 시점엔 막히는 불일치가 없도록. 프리셋은
+ * rhythm(SHORT/MEDIUM/LONG) 토큰으로만 구성되므로, 비교 직전에 pulses로 변환한다.
  */
 @Service
 public class RhythmPresetQueryService {
@@ -33,7 +35,8 @@ public class RhythmPresetQueryService {
 
 		return rhythmPresetRepository.findAll().stream()
 				.map(preset -> new RhythmPresetView(preset,
-						signalRepository.findByLinkIdAndRhythm(linkId, preset.getRhythm(), null).orElse(null)))
+						signalRepository.findByLinkIdAndPulses(linkId, RhythmBeat.toPulses(preset.getRhythm()), null)
+								.orElse(null)))
 				.toList();
 	}
 }

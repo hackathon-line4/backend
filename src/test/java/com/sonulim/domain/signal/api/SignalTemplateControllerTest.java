@@ -51,7 +51,7 @@ class SignalTemplateControllerTest {
 	@Test
 	void returnsTemplatesWithAlreadyAddedFalseWhenNoLinkIdIsGiven() throws Exception {
 		signalTemplateRepository.saveAndFlush(new SignalTemplate("가자", "함께 이동하자는 뜻", SignalCategory.OUTING, "walk",
-				List.of(RhythmBeat.LONG, RhythmBeat.LONG)));
+				null, RhythmBeat.toPulses(List.of(RhythmBeat.LONG, RhythmBeat.LONG))));
 
 		mockMvc.perform(get("/api/v1/signal-templates")
 						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID(), "GUARDIAN")))
@@ -63,9 +63,9 @@ class SignalTemplateControllerTest {
 	void marksAlreadyAddedTrueWhenTheLinkAlreadyHasThatTemplate() throws Exception {
 		UUID linkId = UUID.randomUUID();
 		SignalTemplate template = signalTemplateRepository.saveAndFlush(new SignalTemplate("가자", null,
-				SignalCategory.OUTING, "walk", List.of(RhythmBeat.LONG, RhythmBeat.LONG)));
+				SignalCategory.OUTING, "walk", null, RhythmBeat.toPulses(List.of(RhythmBeat.LONG, RhythmBeat.LONG))));
 		signalRepository.saveAndFlush(Signal.fromTemplate(linkId, template.getId(), "가자", null, SignalCategory.OUTING,
-				"walk", List.of(RhythmBeat.LONG, RhythmBeat.LONG)));
+				"walk", null, RhythmBeat.toPulses(List.of(RhythmBeat.LONG, RhythmBeat.LONG))));
 
 		mockMvc.perform(get("/api/v1/signal-templates")
 						.queryParam("linkId", linkId.toString())
@@ -77,9 +77,9 @@ class SignalTemplateControllerTest {
 	@Test
 	void filtersByQAndCategory() throws Exception {
 		signalTemplateRepository.saveAndFlush(new SignalTemplate("가자", "함께 이동하자는 뜻", SignalCategory.OUTING, "walk",
-				List.of(RhythmBeat.LONG, RhythmBeat.LONG)));
+				null, RhythmBeat.toPulses(List.of(RhythmBeat.LONG, RhythmBeat.LONG))));
 		signalTemplateRepository.saveAndFlush(new SignalTemplate("밥 먹자", "식사하러 오라는 뜻", SignalCategory.DAILY, "meal",
-				List.of(RhythmBeat.SHORT, RhythmBeat.SHORT)));
+				null, RhythmBeat.toPulses(List.of(RhythmBeat.SHORT, RhythmBeat.SHORT))));
 
 		mockMvc.perform(get("/api/v1/signal-templates")
 						.queryParam("category", "DAILY")

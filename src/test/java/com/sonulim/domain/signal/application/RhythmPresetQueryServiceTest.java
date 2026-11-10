@@ -65,7 +65,7 @@ class RhythmPresetQueryServiceTest {
 	void reportsUsedByNullWhenNoSignalUsesThatRhythm() {
 		RhythmPreset preset = new RhythmPreset(List.of(RhythmBeat.SHORT, RhythmBeat.LONG));
 		given(rhythmPresetRepository.findAll()).willReturn(List.of(preset));
-		given(signalRepository.findByLinkIdAndRhythm(linkId, List.of(RhythmBeat.SHORT, RhythmBeat.LONG), null))
+		given(signalRepository.findByLinkIdAndPulses(linkId, RhythmBeat.toPulses(List.of(RhythmBeat.SHORT, RhythmBeat.LONG)), null))
 				.willReturn(Optional.empty());
 
 		List<RhythmPresetView> result = service().list(requesterId, "GUARDIAN", linkId);
@@ -81,7 +81,7 @@ class RhythmPresetQueryServiceTest {
 		Signal existing = Signal.createCustom(linkId, "가자", null, SignalCategory.OUTING, "icon",
 				List.of(RhythmBeat.SHORT, RhythmBeat.LONG));
 		given(rhythmPresetRepository.findAll()).willReturn(List.of(preset));
-		given(signalRepository.findByLinkIdAndRhythm(linkId, List.of(RhythmBeat.SHORT, RhythmBeat.LONG), null))
+		given(signalRepository.findByLinkIdAndPulses(linkId, RhythmBeat.toPulses(List.of(RhythmBeat.SHORT, RhythmBeat.LONG)), null))
 				.willReturn(Optional.of(existing));
 
 		List<RhythmPresetView> result = service().list(requesterId, "GUARDIAN", linkId);
@@ -91,13 +91,13 @@ class RhythmPresetQueryServiceTest {
 
 	@Test
 	void usesTheSameCriterionAsRhythmDuplicateCheckNoExclusion() {
-		// usedBy와 PRESET_IN_USE가 같은 기준을 쓴다는 요구사항 — findByLinkIdAndRhythm을
+		// usedBy와 PRESET_IN_USE가 같은 기준을 쓴다는 요구사항 — findByLinkIdAndPulses를
 		// excludeId=null로 호출하는 것 자체가 "본인 제외 없이 전체 조회"라는 그 기준이다.
 		RhythmPreset preset = new RhythmPreset(List.of(RhythmBeat.LONG, RhythmBeat.LONG));
 		given(rhythmPresetRepository.findAll()).willReturn(List.of(preset));
 
 		service().list(requesterId, "GUARDIAN", linkId);
 
-		verify(signalRepository).findByLinkIdAndRhythm(linkId, List.of(RhythmBeat.LONG, RhythmBeat.LONG), null);
+		verify(signalRepository).findByLinkIdAndPulses(linkId, RhythmBeat.toPulses(List.of(RhythmBeat.LONG, RhythmBeat.LONG)), null);
 	}
 }

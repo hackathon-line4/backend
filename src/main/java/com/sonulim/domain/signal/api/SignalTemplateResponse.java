@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.UUID;
 
 import com.sonulim.domain.signal.application.SignalTemplateView;
-import com.sonulim.domain.signal.domain.RhythmBeat;
 
 public record SignalTemplateResponse(
 		UUID id,
@@ -13,6 +12,7 @@ public record SignalTemplateResponse(
 		String category,
 		String icon,
 		List<String> rhythm,
+		List<Integer> pulses,
 		long durationMs,
 		boolean alreadyAdded) {
 
@@ -24,8 +24,9 @@ public record SignalTemplateResponse(
 				template.getDescription(),
 				template.getCategory().name(),
 				template.getIcon(),
-				template.getRhythm().stream().map(Enum::name).toList(),
-				RhythmBeat.totalDurationMs(template.getRhythm()),
+				template.getRhythm() == null ? null : template.getRhythm().stream().map(Enum::name).toList(),
+				template.getPulses(),
+				template.getPulses().stream().mapToLong(Integer::longValue).sum(),
 				view.alreadyAdded());
 	}
 }
