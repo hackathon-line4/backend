@@ -54,6 +54,8 @@ com.sonulim
 
 앱이 열려 있을 때는 `GET /api/v1/events`(SSE)로 상태 변화를 밀어주고, 닫혀 있을 때는 FCM 데이터 푸시로 전달한다. 이 메커니즘 자체(SSE 연결 관리, 이벤트 발행 허브)는 특정 업무 도메인이 아니라 `global`에 둔다 — 각 도메인은 자기 이벤트를 이 허브에 발행만 한다. 푸시 종류·서버 타이머 등 세부 규칙은 각 도메인 문서([docs/domains/](domains/))의 관련 항목을 참고한다.
 
+SSE 허브 사용법(발행 인터페이스, 연결 동작, 제약)은 [docs/realtime.md](realtime.md)를 참고한다.
+
 ## 데이터 저장
 
 PostgreSQL + Spring Data JPA. 스키마는 당분간 `spring.jpa.hibernate.ddl-auto: update`로 관리한다 — Flyway 마이그레이션 도입은 보류 상태이며, 전환 시점은 팀이 따로 정한다.

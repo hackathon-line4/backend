@@ -1,5 +1,7 @@
 package com.sonulim.global.security;
 
+import jakarta.servlet.DispatcherType;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -36,6 +38,9 @@ public class SecurityConfig {
 				.logout(AbstractHttpConfigurer::disable)
 				.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 				.authorizeHttpRequests(authorize -> authorize
+						// SSE(GET /api/v1/events)가 끝날 때의 비동기 디스패치. 처음 요청에서 이미 인증을 거쳤고, JWT 필터는
+						// 이 디스패치에서 다시 돌지 않아 막으면 커밋된 응답에 401을 쓰려다 실패한다.
+						.dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
 						.requestMatchers(PUBLIC_PATHS).permitAll()
 						.anyRequest().authenticated())
 				.exceptionHandling(exceptions -> exceptions
