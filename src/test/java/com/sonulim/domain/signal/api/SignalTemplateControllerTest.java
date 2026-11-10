@@ -12,6 +12,7 @@ import com.sonulim.domain.signal.domain.SignalTemplateRepository;
 import com.sonulim.global.linkaccess.PassThroughLinkAccessGuardConfig;
 import com.sonulim.global.security.JwtTokenProvider;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -45,7 +46,9 @@ class SignalTemplateControllerTest {
 	}
 
 	// signal_templates는 전역 카탈로그라(@SpringBootTest는 테스트 간 롤백이 없음) 각 테스트
-	// 뒤에 직접 치운다 — 안 그러면 "개수가 1개"류 단언이 다른 테스트의 잔여 데이터와 섞인다.
+	// 전후로 직접 치운다 — 안 그러면 "개수가 1개"류 단언이 다른 테스트의 잔여 데이터나
+	// SignalTemplateCatalogSeeder가 미리 넣어둔 기본 신호 6종과 섞인다(실행 순서 의존).
+	@BeforeEach
 	@AfterEach
 	void cleanUpTemplates() {
 		signalTemplateRepository.deleteAll();
