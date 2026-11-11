@@ -15,6 +15,9 @@
 - 다른 도메인이 읽어 가는 창구 2개 — 본인 조회(`get`)로는 남의 설정을 볼 수 없어 따로 뒀다. 권한은 부르는 쪽이 이미 확인했으므로 여기서 다시 묻지 않는다
   - `NotificationSettingsService.findFor(userId)`: messaging이 응답·무응답 푸시를 보낼지 판단할 때 쓴다(#93). 저장된 값이 없으면 기본값으로 본다
   - `LocationSharingService.isSharingEnabled(userId)`: location·도움 요청이 좌표를 저장해도 되는지 볼 때 쓴다. 저장된 값이 없으면 꺼짐으로 본다
+- 당사자 설정 보기 `GET /api/v1/links/{linkId}/partner-settings` (#98) — 보호자만
+  - 당사자의 진동 설정과 위치 공유 상태를 `{vibration, locationSharing}`으로 묶어 읽기 전용으로 돌려준다. 각 항목 모양은 당사자 본인 조회 응답과 같고, 저장 전이면 기본값
+  - 연결 구성원 확인은 공통 `LinkAccessGuard.requireMembers` — 남의 연결·없는 연결·형식이 틀린 id는 404, 해제된 연결은 409 `LINK_ENDED`(가드 동작 그대로)
 - 역할 확인은 `settings.application.RoleRequirement`(역할 없음 403 `ROLE_REQUIRED`, 다른 역할 403 `ROLE_MISMATCH`) — 공통화 여부는 팀에서 정하기 전까지 이 도메인 안에만 둔다
 
 ### 후속 작업
