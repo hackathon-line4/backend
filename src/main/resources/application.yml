@@ -21,6 +21,13 @@ sonulim:
     refresh-expiration-seconds: ${JWT_REFRESH_EXPIRATION_SECONDS:2592000}
   firebase:
     credentials-path: ${FIREBASE_CREDENTIALS_PATH:}
+  recipient:
+    # 도움 요청을 다시 알리는 간격과 최대 횟수. 백엔드 제안값이고 기획 확정 전이다
+    # (docs/domains/recipient.md의 Pending Decisions).
+    renotify-interval: 1m
+    renotify-limit: 5
+    # 재알림 대상을 훑는 주기(ms).
+    renotify-sweep-interval-ms: 10000
   location:
     # 시간이 지난 요청을 훑는 주기(ms). 요청 제한 시간(30초 제안)은 요청을 만들 때 정해지므로
     # 생성 API가 들어올 때 설정으로 추가한다.

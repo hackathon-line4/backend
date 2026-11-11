@@ -14,8 +14,6 @@ import com.sonulim.domain.messaging.domain.MessageRepository;
 /**
  * 기한이 지난 기록 하나를 판정한다. 건별로 트랜잭션을 끊어, 한 건이 실패해도 나머지 판정이 함께 말리지 않게 한다.
  *
- * <p>TODO 응답 없음 판정 뒤 보호자에게 NO_RESPONSE 푸시를 보내야 한다. "응답 없음 알림이 켜져 있으면"이 조건인데,
- *      보호자의 알림 설정을 읽을 창구가 아직 없다(#71 참고).
  */
 @Service
 public class MessageTimerService {

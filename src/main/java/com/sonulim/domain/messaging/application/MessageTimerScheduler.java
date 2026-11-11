@@ -15,6 +15,10 @@ import com.sonulim.domain.messaging.domain.DeliveryStatus;
 import com.sonulim.domain.messaging.domain.Message;
 import com.sonulim.domain.messaging.domain.MessageRepository;
 import com.sonulim.domain.messaging.domain.ResponseStatus;
+import com.sonulim.domain.settings.application.NotificationSettingsService;
+import com.sonulim.global.push.PushMessage;
+import com.sonulim.global.push.PushSender;
+import com.sonulim.global.push.PushType;
 
 /**
  * 기한이 지난 기록을 주기적으로 훑어 판정한다.
@@ -33,13 +37,18 @@ public class MessageTimerScheduler {
 	private final MessageRepository messageRepository;
 	private final MessageTimerService messageTimerService;
 	private final MessagingProperties properties;
+	private final NotificationSettingsService notificationSettingsService;
+	private final PushSender pushSender;
 	private final Clock clock;
 
 	public MessageTimerScheduler(MessageRepository messageRepository, MessageTimerService messageTimerService,
-			MessagingProperties properties, Clock clock) {
+			MessagingProperties properties, NotificationSettingsService notificationSettingsService,
+			PushSender pushSender, Clock clock) {
 		this.messageRepository = messageRepository;
 		this.messageTimerService = messageTimerService;
 		this.properties = properties;
+		this.notificationSettingsService = notificationSettingsService;
+		this.pushSender = pushSender;
 		this.clock = clock;
 	}
 
@@ -52,10 +61,13 @@ public class MessageTimerScheduler {
 				.findByDeliveryStatusAndAckDeadlineLessThanEqual(DeliveryStatus.REQUESTED, now),
 				Message::markUnconfirmed, now);
 
-		// 응답 없음 판정.
-		judge("응답 없음 판정", messageRepository
-				.findByResponseStatusAndWaitUntilLessThanEqual(ResponseStatus.WAITING, now),
-				Message::markNoResponse, now);
+		// 응답 없음 판정 — 판정된 건만 보호자에게 알린다(알림 켬일 때).
+		for (Message due : messageRepository
+				.findByResponseStatusAndWaitUntilLessThanEqual(ResponseStatus.WAITING, now)) {
+			if (messageTimerService.apply(due.getId(), Message::markNoResponse, now)) {
+				notifyNoResponse(due);
+			}
+		}
 
 		// 긴급 신호 경고 — 전달 후 일정 시간 무응답.
 		LocalDateTime warnIfDeliveredBefore = now.minus(properties.emergencyWarningDelay());
@@ -63,6 +75,17 @@ public class MessageTimerScheduler {
 				.findByEmergencyTrueAndEmergencyWarningFalseAndResponseStatusAndDeliveredAtLessThanEqual(
 						ResponseStatus.WAITING, warnIfDeliveredBefore),
 				Message::markEmergencyWarning, now);
+	}
+
+	/** 판정이 실제로 일어난 건만 알린다 — 경합에서 진 건(터치가 먼저 온 건)은 알리지 않는다. */
+	private void notifyNoResponse(Message message) {
+		if (!notificationSettingsService.findFor(message.getGuardianId()).isNoResponseAlert()) {
+			return;
+		}
+		pushSender.send(PushMessage.to(message.getGuardianId(), PushType.NO_RESPONSE)
+				.with("messageId", message.getId().toString())
+				.with("linkId", message.getLinkId().toString())
+				.build());
 	}
 
 	private void judge(String what, List<Message> due, BiConsumer<Message, LocalDateTime> verdict, LocalDateTime now) {
