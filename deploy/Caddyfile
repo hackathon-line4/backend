@@ -1,0 +1,10 @@
+# DOMAIN에 도메인(예: 13-125-1-2.sslip.io, sonulim.duckdns.org)을 넣으면 Let's Encrypt 인증서를 자동으로 받아 HTTPS로 연다.
+# 인증서 없이 HTTP로만 열려면 DOMAIN=:80 으로 둔다.
+{$DOMAIN} {
+	encode gzip
+
+	reverse_proxy app:8080 {
+		# SSE(GET /api/v1/events)가 버퍼링되지 않고 바로 전달되게 한다.
+		flush_interval -1
+	}
+}
