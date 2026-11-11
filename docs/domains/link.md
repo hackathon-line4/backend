@@ -48,6 +48,14 @@
   - 구성원인지 먼저 보고 상태는 그다음에 본다 — 남의 해제된 연결도 404라서 연결이 있었다는 사실이 드러나지 않는다.
   - 연결 확인(#43, 해제된 연결은 404)과 연결 해제(#41, 이미 해제돼도 204)는 각자 규칙이 있어 이 검증을 쓰지 않는다.
   - 테스트: 실제 연결 없이 임의의 linkId로 API를 부르는 테스트는 `PassThroughLinkAccessGuardConfig`(test 소스)를 `@Import`한다(signal API 테스트 5개).
+- **홈 요약 (#81)** — `GET /api/v1/links/{linkId}/home`(S-4, 예외로 이 도메인에 포함).
+  - 보호자만(당사자는 403 `ROLE_MISMATCH`, 역할 선택 전은 403 `ROLE_REQUIRED`). 연결 구성원이 아니거나 없는 연결은 404 `NOT_FOUND`(`LinkAccessGuard.verifyAccessible`). `linkId` 형식 오류는 400 `VALIDATION_FAILED`(`field=linkId`) — 경로 변수를 UUID로 받아 공통 처리기가 바꾼다(다른 link API의 404와 다름, 명세).
+  - `recipient`: 당사자 `id`·`name`·`initial`, `connection`(연결 확인 결과, 연결 요청 응답과 같은 모양), `status`, `lastResponse`(응답 받은 보호자 신호 중 응답 시각이 가장 최근인 것, 없으면 `null`).
+  - `status.type`: `HELP_REQUESTED`(보호자가 열어 보지 않은 도움 요청) > `NO_RESPONSE`·`WAITING`(가장 최근 보호자 신호 1건의 터치 응답) > `OK`. `OK`면 나머지 필드는 `null`. 판정 규칙은 Pending Decisions "홈 요약 해석".
+  - `favoriteSignals`: signal의 `FavoriteSignalQueryService.list(linkId)`로 지정 순서대로, 삭제된 신호를 빼고 최대 6개. 모양은 신호 API의 `SignalResponse` 그대로.
+  - `location`: 위치 공유 정책 확정 전이라 `{sharingEnabled: false, last: null}` 고정(명세 허용).
+  - `recentActivities`: 기록 최신 3건(최신순), 기록 API의 HistoryItem 모양 그대로.
+  - 다른 도메인은 각자의 조회 서비스로 읽는다 — 사용자는 account `UserQueryService`, 자주 쓰는 신호는 signal `FavoriteSignalQueryService`, 기록·상태는 history `HistoryService.homeRecords`(messaging·recipient를 읽는 곳은 history 한 곳). link는 messaging·recipient를 직접 읽지 않는다.
 
 ### 후속 작업 (해당 기능 구현 시)
 
@@ -85,4 +93,11 @@
 - **만료된 요청의 `decidedAt`**: 명세 예시는 승인·거절·취소에만 `decidedAt`이 있고 `EXPIRED` 예시가 없다. 지금은 사람이 정한 것이 아니라서 `null`로 둔다. — 프론트 확인 필요.
 - **코드 확인 잠금 시간**: 명세는 "10분에 10회 틀리면 `TOO_MANY_ATTEMPTS`"만 적혀 있고 잠금 시간이 없다. 지금은 첫 실패부터 10분 구간이 끝날 때까지 막는다(명세 예시 `retryAfterSec: 300`과 맞음). 성공해도 실패 횟수를 지우지 않는다.
 - **QR 스킴 철자**: 명세의 `qrPayload`가 `sonullim://link?code=…`(l 두 개)로 프로젝트 이름(`sonulim`)과 다르다. 명세 그대로 구현했고, 프론트 딥링크 스킴과 맞는지 확인 필요.
+- **홈 요약 해석 (#81)**: 명세에 값 목록·우선순위만 있어서 아래처럼 정했다. — 프론트 확인 필요.
+  - `status` 판정: 열어 보지 않은 도움 요청이 있으면 `HELP_REQUESTED`(가장 최근 것), 아니면 가장 최근 보호자 신호(연습 제외) 1건의 터치 응답이 `NO_RESPONSE`·`WAITING`이면 그 값, 그 밖은 `OK`. 이전 신호의 미해결 상태는 보지 않는다.
+  - `since`: 신호는 보낸 시각(`requestedAt`), 도움 요청은 보낸 시각(`sentAt`). `elapsedMinutes`는 그때부터 지금까지 분(내림). `HELP_REQUESTED`의 `messageId`는 도움 요청 id, `signalName`은 "도움 요청"(기록 API와 같은 표기).
+  - 가장 최근 보호자 신호가 전달 중(`REQUESTED`)·전송 실패(`FAILED`)·전달 확인 안 됨(`UNCONFIRMED`)이면 `OK`로 둔다 — 명세의 `status.type` 값 목록에 없다.
+  - `initial`: 이름의 첫 글자(예: "김하늘" → "김").
+  - 해제된(`ENDED`) 연결도 정상 응답한다 — 조회 API라 `verifyAccessible`을 따른다(#75).
+  - 당사자 사용자 정보가 없으면(탈퇴 등) 404 `NOT_FOUND`.
 - **id 형식**: 명세 예시는 `"usr_1"`·`"lrq_7"`·`"lnk_1"`이지만 다른 API와 같이 UUID로 내려준다.

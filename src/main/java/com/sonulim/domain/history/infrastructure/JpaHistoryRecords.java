@@ -2,7 +2,9 @@ package com.sonulim.domain.history.infrastructure;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import jakarta.persistence.EntityManager;
@@ -70,6 +72,55 @@ class JpaHistoryRecords implements HistoryRecords {
 						+ "and s.sentAt < :before", linkId, guardianId, before)
 				|| exists("select h.id from HelpRequest h where h.linkId = :linkId and h.guardianId = :guardianId "
 						+ "and h.sentAt < :before", linkId, guardianId, before);
+	}
+
+	// 세 표에서 각자 최신 limit건씩 읽어 합친 뒤 다시 limit건으로 자른다.
+	@Override
+	public List<HistoryItem> findLatest(UUID linkId, UUID guardianId, int limit) {
+		List<HistoryItem> items = new ArrayList<>();
+		latest("select m from Message m where m.linkId = :linkId and m.guardianId = :guardianId "
+				+ "order by m.requestedAt desc", Message.class, linkId, guardianId, limit)
+				.forEach(message -> items.add(toItem(message)));
+		latest("select s from RecipientSignal s where s.linkId = :linkId and s.guardianId = :guardianId "
+				+ "order by s.sentAt desc", RecipientSignal.class, linkId, guardianId, limit)
+				.forEach(signal -> items.add(toItem(signal)));
+		latest("select h from HelpRequest h where h.linkId = :linkId and h.guardianId = :guardianId "
+				+ "order by h.sentAt desc", HelpRequest.class, linkId, guardianId, limit)
+				.forEach(helpRequest -> items.add(toItem(helpRequest)));
+		return items.stream()
+				.sorted(Comparator.comparing(HistoryItem::occurredAt).reversed())
+				.limit(limit)
+				.toList();
+	}
+
+	@Override
+	public Optional<HistoryItem> findLatestUnopenedHelpRequest(UUID linkId, UUID guardianId) {
+		return latest("select h from HelpRequest h where h.linkId = :linkId and h.guardianId = :guardianId "
+				+ "and h.receipt.openedAt is null order by h.sentAt desc", HelpRequest.class, linkId, guardianId, 1)
+				.stream().findFirst().map(JpaHistoryRecords::toItem);
+	}
+
+	@Override
+	public Optional<HistoryItem> findLatestGuardianSignal(UUID linkId, UUID guardianId) {
+		return latest("select m from Message m where m.linkId = :linkId and m.guardianId = :guardianId "
+				+ "and m.kind = com.sonulim.domain.messaging.domain.MessageKind.SIGNAL order by m.requestedAt desc",
+				Message.class, linkId, guardianId, 1)
+				.stream().findFirst().map(JpaHistoryRecords::toItem);
+	}
+
+	@Override
+	public Optional<HistoryItem> findLatestRespondedSignal(UUID linkId, UUID guardianId) {
+		return latest("select m from Message m where m.linkId = :linkId and m.guardianId = :guardianId "
+				+ "and m.responseStatus = com.sonulim.domain.messaging.domain.ResponseStatus.RESPONDED "
+				+ "order by m.respondedAt desc", Message.class, linkId, guardianId, 1)
+				.stream().findFirst().map(JpaHistoryRecords::toItem);
+	}
+
+	private <T> List<T> latest(String jpql, Class<T> type, UUID linkId, UUID guardianId, int limit) {
+		return entityManager.createQuery(jpql, type)
+				.setParameter("linkId", linkId).setParameter("guardianId", guardianId)
+				.setMaxResults(limit)
+				.getResultList();
 	}
 
 	private boolean exists(String jpql, UUID linkId, UUID guardianId, LocalDateTime before) {
