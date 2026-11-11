@@ -29,7 +29,7 @@ public record HelpRequestResponse(UUID id, UUID linkId, Sender sender, LocalDate
 		}
 	}
 
-	static HelpRequestResponse of(HelpRequest request, UserSummary sender) {
+	public static HelpRequestResponse of(HelpRequest request, UserSummary sender) {
 		return new HelpRequestResponse(request.getId(), request.getLinkId(),
 				new Sender(request.getSenderId(), sender == null ? null : sender.name()),
 				request.getSentAt(), request.getGuardianDeliveredAt(), request.getGuardianOpenedAt(),

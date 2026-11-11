@@ -28,12 +28,15 @@ public class FulfillLocationService {
 	private final LocationRequestRepository locationRequestRepository;
 	private final LastLocationRepository lastLocationRepository;
 	private final LocationSharingService locationSharingService;
+	private final LocationEvents locationEvents;
 
 	public FulfillLocationService(LocationRequestRepository locationRequestRepository,
-			LastLocationRepository lastLocationRepository, LocationSharingService locationSharingService) {
+			LastLocationRepository lastLocationRepository, LocationSharingService locationSharingService,
+			LocationEvents locationEvents) {
 		this.locationRequestRepository = locationRequestRepository;
 		this.lastLocationRepository = lastLocationRepository;
 		this.locationSharingService = locationSharingService;
+		this.locationEvents = locationEvents;
 	}
 
 	/**
@@ -50,28 +53,36 @@ public class FulfillLocationService {
 		LocationRequest request = findOwn(user, requestId);
 		if (!locationSharingService.isSharingEnabled(user.userId())) {
 			request.markFailed(LocationFailureReason.SHARING_OFF);
+			locationEvents.requestUpdated(request);
 			return;
 		}
-		overwriteLastLocation(user.userId(), latitude, longitude, accuracyM, capturedAt);
+		LastLocation last = overwriteLastLocation(user.userId(), latitude, longitude, accuracyM, capturedAt);
 		request.markFulfilled();
+		// 시간 초과로 이미 끝난 요청이어도 보낸다 — 늦게 도착한 위치도 보호자에게는 새 위치다.
+		locationEvents.locationUpdated(request, last);
 	}
 
 	/** 기기가 위치를 얻지 못했다. 마지막 위치는 그대로 둔다 — 예전 위치가 지워질 이유가 없다. */
 	@Transactional
 	public void fail(AuthenticatedUser user, UUID requestId, LocationFailureReason reason) {
-		findOwn(user, requestId).markFailed(reason);
+		LocationRequest request = findOwn(user, requestId);
+		request.markFailed(reason);
+		locationEvents.requestUpdated(request);
 	}
 
 	/**
 	 * 당사자당 한 건만 두고 덮어쓴다 — 이동 경로를 쌓지 않는 것이 이 서비스의 위치 정책이다.
 	 * 주소는 좌표를 주소로 바꾸는 외부 연동이 정해지면 채운다.
 	 */
-	private void overwriteLastLocation(UUID recipientId, BigDecimal latitude, BigDecimal longitude,
+	private LastLocation overwriteLastLocation(UUID recipientId, BigDecimal latitude, BigDecimal longitude,
 			Integer accuracyM, LocalDateTime capturedAt) {
-		lastLocationRepository.findById(recipientId)
-				.ifPresentOrElse(last -> last.overwriteWith(latitude, longitude, accuracyM, capturedAt),
-						() -> lastLocationRepository.save(
-								LastLocation.of(recipientId, latitude, longitude, accuracyM, capturedAt)));
+		return lastLocationRepository.findById(recipientId)
+				.map(last -> {
+					last.overwriteWith(latitude, longitude, accuracyM, capturedAt);
+					return last;
+				})
+				.orElseGet(() -> lastLocationRepository.save(
+						LastLocation.of(recipientId, latitude, longitude, accuracyM, capturedAt)));
 	}
 
 	private LocationRequest findOwn(AuthenticatedUser user, UUID requestId) {

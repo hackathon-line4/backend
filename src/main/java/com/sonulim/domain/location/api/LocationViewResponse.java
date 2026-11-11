@@ -17,7 +17,7 @@ public record LocationViewResponse(boolean sharingEnabled, Last last, LocationRe
 	public record Last(BigDecimal latitude, BigDecimal longitude, Integer accuracyM, String address,
 			LocalDateTime capturedAt) {
 
-		static Last from(LastLocation location) {
+		public static Last from(LastLocation location) {
 			return location == null ? null : new Last(location.getLatitude(), location.getLongitude(),
 					location.getAccuracyM(), location.getAddress(), location.getCapturedAt());
 		}

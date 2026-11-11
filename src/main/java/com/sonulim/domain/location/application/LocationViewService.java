@@ -39,17 +39,20 @@ public class LocationViewService {
 	private final LocationSharingService locationSharingService;
 	private final LinkAccessGuard linkAccessGuard;
 	private final PushSender pushSender;
+	private final LocationEvents locationEvents;
 	private final LocationProperties properties;
 	private final Clock clock;
 
 	public LocationViewService(LocationRequestRepository locationRequestRepository,
 			LastLocationRepository lastLocationRepository, LocationSharingService locationSharingService,
-			LinkAccessGuard linkAccessGuard, PushSender pushSender, LocationProperties properties, Clock clock) {
+			LinkAccessGuard linkAccessGuard, PushSender pushSender, LocationEvents locationEvents,
+			LocationProperties properties, Clock clock) {
 		this.locationRequestRepository = locationRequestRepository;
 		this.lastLocationRepository = lastLocationRepository;
 		this.locationSharingService = locationSharingService;
 		this.linkAccessGuard = linkAccessGuard;
 		this.pushSender = pushSender;
+		this.locationEvents = locationEvents;
 		this.properties = properties;
 		this.clock = clock;
 	}
@@ -79,6 +82,7 @@ public class LocationViewService {
 				.with("locationRequestId", request.getId().toString())
 				.with("linkId", members.linkId().toString())
 				.build());
+		locationEvents.requestCreated(request);
 		return request;
 	}
 

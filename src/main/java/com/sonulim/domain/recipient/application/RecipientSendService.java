@@ -42,17 +42,20 @@ public class RecipientSendService {
 	private final UserQueryService userQueryService;
 	private final LinkAccessGuard linkAccessGuard;
 	private final PushSender pushSender;
+	private final RecipientEvents recipientEvents;
 	private final Clock clock;
 
 	public RecipientSendService(RecipientSignalRepository recipientSignalRepository,
 			HelpRequestRepository helpRequestRepository, LocationSharingService locationSharingService,
-			UserQueryService userQueryService, LinkAccessGuard linkAccessGuard, PushSender pushSender, Clock clock) {
+			UserQueryService userQueryService, LinkAccessGuard linkAccessGuard, PushSender pushSender,
+			RecipientEvents recipientEvents, Clock clock) {
 		this.recipientSignalRepository = recipientSignalRepository;
 		this.helpRequestRepository = helpRequestRepository;
 		this.locationSharingService = locationSharingService;
 		this.userQueryService = userQueryService;
 		this.linkAccessGuard = linkAccessGuard;
 		this.pushSender = pushSender;
+		this.recipientEvents = recipientEvents;
 		this.clock = clock;
 	}
 
@@ -69,6 +72,7 @@ public class RecipientSendService {
 				.with("recipientSignalId", signal.getId().toString())
 				.with("linkId", members.linkId().toString())
 				.build());
+		recipientEvents.signalCreated(signal);
 		return new CalledGuardian(signal, user(user.userId()));
 	}
 
@@ -90,6 +94,7 @@ public class RecipientSendService {
 				.with("helpRequestId", request.getId().toString())
 				.with("linkId", members.linkId().toString())
 				.build());
+		recipientEvents.helpRequestCreated(request);
 		return new HelpRequestQueryService.HelpRequestDetail(request, user(user.userId()), java.util.List.of());
 	}
 

@@ -30,22 +30,22 @@ public class MessageTimerService {
 	 *
 	 * <p>Message의 전이 메서드가 상태를 한 번 더 확인하므로, 읽은 뒤 상태가 바뀐 경우에도 안전하다.
 	 *
-	 * @return 실제로 판정이 일어났으면 true
+	 * @return 판정된 기록, 판정이 일어나지 않았으면 null. 부르는 쪽이 판정된 건에만 알림·이벤트를 보낸다
 	 */
 	@Transactional
-	public boolean apply(UUID messageId, BiConsumer<Message, LocalDateTime> verdict, LocalDateTime now) {
+	public Message apply(UUID messageId, BiConsumer<Message, LocalDateTime> verdict, LocalDateTime now) {
 		Message message = messageRepository.findById(messageId).orElse(null);
 		if (message == null) {
-			return false;
+			return null;
 		}
 		try {
 			verdict.accept(message, now);
 			messageRepository.saveAndFlush(message);
-			return true;
+			return message;
 		}
 		catch (ObjectOptimisticLockingFailureException alreadyChanged) {
 			// 응답이 먼저 들어왔다. 판정을 버린다.
-			return false;
+			return null;
 		}
 	}
 }

@@ -30,14 +30,17 @@ public class MessageReceiptService {
 	private final MessagingProperties properties;
 	private final NotificationSettingsService notificationSettingsService;
 	private final PushSender pushSender;
+	private final MessagingEvents messagingEvents;
 	private final Clock clock;
 
 	public MessageReceiptService(MessageRepository messageRepository, MessagingProperties properties,
-			NotificationSettingsService notificationSettingsService, PushSender pushSender, Clock clock) {
+			NotificationSettingsService notificationSettingsService, PushSender pushSender,
+			MessagingEvents messagingEvents, Clock clock) {
 		this.messageRepository = messageRepository;
 		this.properties = properties;
 		this.notificationSettingsService = notificationSettingsService;
 		this.pushSender = pushSender;
+		this.messagingEvents = messagingEvents;
 		this.clock = clock;
 	}
 
@@ -45,12 +48,15 @@ public class MessageReceiptService {
 	public Message ack(AuthenticatedUser user, UUID messageId, LocalDateTime deviceReceivedAt) {
 		Message message = findForRecipient(user, messageId);
 		message.ack(LocalDateTime.now(clock), deviceReceivedAt, properties.defaultResponseWaitMinutes());
+		messagingEvents.updated(message);
 		return message;
 	}
 
 	@Transactional
 	public void reportPlayback(AuthenticatedUser user, UUID messageId, int count) {
-		findForRecipient(user, messageId).reportPlayback(count, LocalDateTime.now(clock));
+		Message message = findForRecipient(user, messageId);
+		message.reportPlayback(count, LocalDateTime.now(clock));
+		messagingEvents.updated(message);
 	}
 
 	/**
@@ -70,6 +76,7 @@ public class MessageReceiptService {
 					.with("linkId", message.getLinkId().toString())
 					.build());
 		}
+		messagingEvents.updated(message);
 		return message;
 	}
 

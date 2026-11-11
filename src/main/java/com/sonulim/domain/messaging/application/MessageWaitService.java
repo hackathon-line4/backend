@@ -25,13 +25,15 @@ public class MessageWaitService {
 
 	private final MessageRepository messageRepository;
 	private final UserQueryService userQueryService;
+	private final MessagingEvents messagingEvents;
 	private final MessagingProperties properties;
 	private final Clock clock;
 
 	public MessageWaitService(MessageRepository messageRepository, UserQueryService userQueryService,
-			MessagingProperties properties, Clock clock) {
+			MessagingEvents messagingEvents, MessagingProperties properties, Clock clock) {
 		this.messageRepository = messageRepository;
 		this.userQueryService = userQueryService;
+		this.messagingEvents = messagingEvents;
 		this.properties = properties;
 		this.clock = clock;
 	}
@@ -47,6 +49,7 @@ public class MessageWaitService {
 				.orElseThrow(() -> new SonulimException(ErrorCode.NOT_FOUND, "기록을 찾을 수 없어요"));
 		message.extendWait(LocalDateTime.now(clock),
 				minutes != null ? minutes : properties.defaultResponseWaitMinutes());
+		messagingEvents.updated(message);
 		// 더 기다리기 응답에는 타임라인이 없어 canResend를 쓰지 않는다.
 		return new MessageQueryService.MessageDetail(message, user(message.getGuardianId()),
 				user(message.getRecipientId()), false);
