@@ -10,7 +10,7 @@ import com.sonulim.domain.location.domain.LocationRequestStatus;
 public record LocationRequestResponse(UUID id, LocationRequestStatus status, LocalDateTime requestedAt,
 		LocalDateTime timeoutAt, LocationFailureReason failureReason) {
 
-	static LocationRequestResponse from(LocationRequest request) {
+	public static LocationRequestResponse from(LocationRequest request) {
 		return new LocationRequestResponse(request.getId(), request.getStatus(), request.getRequestedAt(),
 				request.getTimeoutAt(), request.getFailureReason());
 	}
