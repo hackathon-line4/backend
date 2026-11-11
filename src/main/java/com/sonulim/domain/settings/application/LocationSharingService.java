@@ -2,6 +2,7 @@ package com.sonulim.domain.settings.application;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
@@ -31,6 +32,20 @@ public class LocationSharingService {
 		RoleRequirement.require(user, Role.RECIPIENT);
 		return locationSharingRepository.findById(user.userId())
 				.orElseGet(() -> LocationSharing.defaults(user.userId()));
+	}
+
+	/**
+	 * 다른 도메인이 당사자의 위치 공유 상태를 읽는 창구(#88). 보호자가 부르는 위치 API가
+	 * "이 당사자가 공유를 켜 뒀는가"를 알아야 하는데, {@link #get(AuthenticatedUser)}은 본인 조회라
+	 * 보호자가 부르면 역할 검사에서 막힌다.
+	 *
+	 * <p>권한은 부르는 쪽이 이미 확인했으므로(연결 구성원인지) 여기서 다시 묻지 않는다.
+	 * 저장된 값이 없으면 꺼짐으로 본다 — 켠 적이 없으면 꺼진 것이다.
+	 */
+	public boolean isSharingEnabled(UUID userId) {
+		return locationSharingRepository.findById(userId)
+				.map(LocationSharing::isEnabled)
+				.orElse(false);
 	}
 
 	/**

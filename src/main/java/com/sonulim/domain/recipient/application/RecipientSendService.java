@@ -95,7 +95,7 @@ public class RecipientSendService {
 
 	/** 공유가 꺼져 있으면 기기가 뭘 보냈든 NOT_SHARED다. HelpRequest가 그때 좌표를 버린다. */
 	private LocationStatus withSharingApplied(AuthenticatedUser user, LocationStatus requested) {
-		return locationSharingService.get(user).isEnabled() ? requested : LocationStatus.NOT_SHARED;
+		return locationSharingService.isSharingEnabled(user.userId()) ? requested : LocationStatus.NOT_SHARED;
 	}
 
 	private UserSummary user(UUID userId) {
