@@ -76,6 +76,36 @@ class MeLinksApiIntegrationTest {
 	}
 
 	@Test
+	void loginReturnsSameLinksAsMe() throws Exception {
+		String guardian = account("login-links-g@example.com", "이영희", "GUARDIAN");
+		String recipient = account("login-links-r@example.com", "김하늘", "RECIPIENT");
+		String linkId = approve(guardian, requestLink(guardian, recipient));
+
+		mockMvc.perform(post("/api/v1/auth/login")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(objectMapper.writeValueAsString(
+								Map.of("email", "login-links-r@example.com", "password", "abcd1234"))))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.links", hasSize(1)))
+				.andExpect(jsonPath("$.data.links[0].id").value(linkId))
+				.andExpect(jsonPath("$.data.links[0].guardian.name").value("이영희"))
+				.andExpect(jsonPath("$.data.links[0].recipient.name").value("김하늘"))
+				.andExpect(jsonPath("$.data.links[0].connection.state").value("UNKNOWN"));
+	}
+
+	@Test
+	void loginWithoutLinkReturnsEmptyLinks() throws Exception {
+		account("login-nolink@example.com", "이영희", "GUARDIAN");
+
+		mockMvc.perform(post("/api/v1/auth/login")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(objectMapper.writeValueAsString(
+								Map.of("email", "login-nolink@example.com", "password", "abcd1234"))))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.links", empty()));
+	}
+
+	@Test
 	void linksAreEmptyAfterUnlink() throws Exception {
 		String guardian = account("me-ended-g@example.com", "이영희", "GUARDIAN");
 		String recipient = account("me-ended-r@example.com", "김하늘", "RECIPIENT");

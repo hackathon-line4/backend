@@ -2,7 +2,9 @@ package com.sonulim.domain.account.application;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.dao.DataIntegrityViolationException;
@@ -15,6 +17,7 @@ import com.sonulim.domain.account.domain.User;
 import com.sonulim.domain.account.domain.UserAgreement;
 import com.sonulim.domain.account.domain.UserAgreementRepository;
 import com.sonulim.domain.account.domain.UserRepository;
+import com.sonulim.domain.link.domain.Link;
 import com.sonulim.global.exception.ErrorCode;
 import com.sonulim.global.exception.SonulimException;
 
@@ -27,17 +30,22 @@ public class AuthService {
 	private final TokenService tokenService;
 	private final DeviceService deviceService;
 	private final LoginAttemptLimiter loginAttemptLimiter;
+	private final MyLinksReader myLinksReader;
+	private final UserQueryService userQueryService;
 	private final Clock clock;
 
-	public AuthService(UserRepository userRepository, UserAgreementRepository userAgreementRepository,
+	AuthService(UserRepository userRepository, UserAgreementRepository userAgreementRepository,
 			PasswordEncoder passwordEncoder, TokenService tokenService, DeviceService deviceService,
-			LoginAttemptLimiter loginAttemptLimiter, Clock clock) {
+			LoginAttemptLimiter loginAttemptLimiter, MyLinksReader myLinksReader, UserQueryService userQueryService,
+			Clock clock) {
 		this.userRepository = userRepository;
 		this.userAgreementRepository = userAgreementRepository;
 		this.passwordEncoder = passwordEncoder;
 		this.tokenService = tokenService;
 		this.deviceService = deviceService;
 		this.loginAttemptLimiter = loginAttemptLimiter;
+		this.myLinksReader = myLinksReader;
+		this.userQueryService = userQueryService;
 		this.clock = clock;
 	}
 
@@ -84,7 +92,14 @@ public class AuthService {
 		}
 
 		loginAttemptLimiter.recordSuccess(email);
-		return AuthResult.of(tokenService.issue(user), user);
+		// 앱은 로그인 직후 links로 화면을 나누므로 GET /me와 같은 연결 목록을 함께 돌려준다(API 명세).
+		List<Link> links = myLinksReader.activeLinks(user.getId());
+		Set<UUID> peopleIds = new HashSet<>();
+		links.forEach(link -> {
+			peopleIds.add(link.getGuardianId());
+			peopleIds.add(link.getRecipientId());
+		});
+		return AuthResult.of(tokenService.issue(user), user, links, userQueryService.findAll(peopleIds));
 	}
 
 	/**
