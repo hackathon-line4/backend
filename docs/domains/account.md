@@ -20,7 +20,10 @@
   - 같은 토큰 동시 갱신은 비관적 락으로 하나만 성공 — 나머지는 재사용으로 처리되므로 앱은 갱신을 한 번만 보내야 한다(노션 명세의 단일 비행 처리)
 - 로그아웃은 인증 필요. 내 토큰이 아니거나 이미 무효화된 토큰이어도 204(앱은 응답과 관계없이 로그아웃)
 - 역할 선택 응답은 `{user, accessToken, refreshToken}` — 액세스 토큰에 역할이 담기므로 역할이 담긴 새 토큰을 바로 내려준다(팀 결정, 노션 명세 응답 갱신 대상). 같은 역할 재요청도 새 토큰을 발급하며 이전 갱신 토큰은 만료 전까지 유효
-- `GET /me`의 `links`는 빈 배열, `pendingLinkRequest`는 `null` — `link` 도메인 구현 후 채운다
+- `GET /me`의 `links`·`pendingLinkRequest` (#97) — 응답 모양은 link API 응답과 같다
+  - `links`: 내가 보호자나 당사자로 속한 `ACTIVE` 연결(MVP 0~1개). 연결 해제(`ENDED`)되면 빠진다
+  - `pendingLinkRequest`: 당사자가 보낸 `PENDING` 요청 중 만료 전 가장 최근 것. 보호자는 항상 `null`
+  - link에 사용자 기준 조회가 없어서 link 코드를 고치지 않고 `MyLinksReader`가 link 엔티티를 읽기 전용으로 조회한다
 - Swagger: 인증이 필요한 API는 `@SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)`를 붙이면 Authorize 버튼으로 토큰을 넣어 호출할 수 있다
 - 다른 도메인이 사용자 이름·역할이 필요하면 `UserRepository` 대신 `UserQueryService`를 쓴다 (#47)
   - `find(userId)` → `Optional<UserSummary>`, `findAll(userIds)` → `Map<UUID, UserSummary>`(목록은 한 번에 조회)
@@ -37,6 +40,8 @@
 - 다른 도메인용 푸시 대상 조회·무효 토큰 삭제 메서드, FCM 발송 코드(`PushSender`) 위치·담당 — 팀 회의에서 정한 뒤 추가
 - 로그아웃: 이 사용자의 SSE 연결 종료 (실시간 구현 시)
 - 역할 선택: 보호자 알림 설정 기본값, 당사자 위치 공유 기본값 생성 (settings 구현 시)
+- `MyLinksReader`: link 도메인에 "사용자 기준 연결·대기 요청 조회" 서비스가 생기면 그쪽 호출로 교체
+- 로그인·회원가입 응답의 `links`: 명세상 `GET /me`와 같은 값인데 아직 빈 배열 — 진행 여부 확인 후 같은 조회로 채움
 
 ## Pending Decisions
 
