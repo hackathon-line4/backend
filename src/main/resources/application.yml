@@ -22,8 +22,10 @@ sonulim:
   firebase:
     credentials-path: ${FIREBASE_CREDENTIALS_PATH:}
   location:
-    # 시간이 지난 요청을 훑는 주기(ms). 요청 제한 시간(30초 제안)은 요청을 만들 때 정해지므로
-    # 생성 API가 들어올 때 설정으로 추가한다.
+    # 당사자 기기에 위치를 요청하고 기다리는 시간. 백엔드 제안값이고 프론트 확인 전이다
+    # (docs/domains/location.md의 Pending Decisions).
+    request-timeout: 30s
+    # 시간이 지난 요청을 훑는 주기(ms).
     timeout-sweep-interval-ms: 5000
   idempotency:
     # 공통 규칙에 24시간으로 확정되어 있다.
