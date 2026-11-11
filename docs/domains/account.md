@@ -24,6 +24,7 @@
   - `links`: 내가 보호자나 당사자로 속한 `ACTIVE` 연결(MVP 0~1개). 연결 해제(`ENDED`)되면 빠진다
   - `pendingLinkRequest`: 당사자가 보낸 `PENDING` 요청 중 만료 전 가장 최근 것. 보호자는 항상 `null`
   - link에 사용자 기준 조회가 없어서 link 코드를 고치지 않고 `MyLinksReader`가 link 엔티티를 읽기 전용으로 조회한다
+- 로그인 응답의 `links`도 `GET /me`의 `links`와 같은 값으로 채운다(API 명세, #101). 회원가입·역할 선택 응답은 연결이 있을 수 없어 빈 배열
 - Swagger: 인증이 필요한 API는 `@SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)`를 붙이면 Authorize 버튼으로 토큰을 넣어 호출할 수 있다
 - 다른 도메인이 사용자 이름·역할이 필요하면 `UserRepository` 대신 `UserQueryService`를 쓴다 (#47)
   - `find(userId)` → `Optional<UserSummary>`, `findAll(userIds)` → `Map<UUID, UserSummary>`(목록은 한 번에 조회)
@@ -41,8 +42,6 @@
 - 로그아웃: 이 사용자의 SSE 연결 종료 (실시간 구현 시)
 - 역할 선택: 보호자 알림 설정 기본값, 당사자 위치 공유 기본값 생성 (settings 구현 시)
 - `MyLinksReader`: link 도메인에 "사용자 기준 연결·대기 요청 조회" 서비스가 생기면 그쪽 호출로 교체
-- 로그인·회원가입 응답의 `links`: 명세상 `GET /me`와 같은 값인데 아직 빈 배열 — 진행 여부 확인 후 같은 조회로 채움
-
 ## Pending Decisions
 
 - **비밀번호 찾기**: 이메일 재설정 링크 방식(부가 기능). — 기획 확인 필요.
