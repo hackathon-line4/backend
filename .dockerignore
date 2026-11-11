@@ -1,0 +1,12 @@
+# 빌드 결과·캐시·로컬 설정은 이미지에 넣지 않는다(이미지 안에서 다시 빌드한다).
+build/
+.gradle/
+.idea/
+*.iml
+.git/
+.github/
+docs/
+deploy/
+.env
+.env.*
+**/.DS_Store

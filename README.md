@@ -6,13 +6,30 @@
 
 Java 17, Spring Boot 3.3.4, Gradle, Spring Data JPA + PostgreSQL(`ddl-auto: update`, Flyway는 추후 전환), JWT(`jjwt`), springdoc-openapi(Swagger), Firebase Admin SDK(FCM).
 
-## 로컬 실행
+## 실행 (프론트 연동용)
 
-자세한 절차는 [docs/local-setup.md](docs/local-setup.md) 참고. 요약:
+Docker Desktop만 있으면 된다. JDK·DB 설치나 `.env`는 필요 없다.
 
 ```bash
-cp .env.example .env   # 값 채우기
-docker compose up -d   # 로컬 Postgres
+git clone https://github.com/hackathon-line4/backend.git
+cd backend
+git checkout dev
+docker compose up -d --build   # 처음엔 이미지 빌드로 몇 분 걸린다
+```
+
+- API: `http://localhost:8080` · Swagger: http://localhost:8080/swagger-ui/index.html
+- 최신 코드 반영: `git pull` 후 `docker compose up -d --build`
+- 끄고 켜기: Docker Desktop의 `backend` 묶음에서 ■·▶︎ (또는 `docker compose stop` / `docker compose start`)
+- DB 초기화: `docker compose down -v` 후 다시 `docker compose up -d --build`
+- 푸시 알림은 실제로 보내지 않고 서버 로그에만 남는다. 실시간 이벤트(SSE)는 동작한다.
+- 에뮬레이터·실기기에서 접속: Android 에뮬레이터는 `http://10.0.2.2:8080`, 같은 와이파이의 실기기는 `http://<이 컴퓨터의 IP>:8080`
+
+## 백엔드 개발
+
+DB만 Docker로 띄우고 앱은 IDE·Gradle로 실행한다. 자세한 절차는 [docs/local-setup.md](docs/local-setup.md).
+
+```bash
+docker compose up -d postgres
 ./gradlew bootRun
 ```
 

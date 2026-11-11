@@ -1,3 +1,6 @@
+# 로컬 실행용.
+# - 프론트·전체 실행: docker compose up -d --build  → http://localhost:8080
+# - 백엔드 개발(bootRun): docker compose up -d postgres  → DB만 띄우고 앱은 ./gradlew bootRun
 services:
   postgres:
     image: postgres:16
@@ -15,6 +18,30 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  app:
+    build: .
+    image: sonulim-backend:local
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # 로컬 설정. 푸시는 실제로 보내지 않고 로그로만 남는다.
+      SPRING_PROFILES_ACTIVE: local
+      # local 설정의 localhost 대신 postgres 컨테이너로 접속한다.
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-sonulim}
+      DB_USERNAME: ${DB_USERNAME:-sonulim}
+      DB_PASSWORD: ${DB_PASSWORD:-sonulim}
+      # 비어 있으면 로컬 개발용 키를 쓴다(32바이트 이상).
+      JWT_SECRET: ${JWT_SECRET:-local-dev-only-jwt-secret-do-not-use-in-prod-0123456789}
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   sonulim-postgres-data:
