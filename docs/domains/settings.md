@@ -12,12 +12,14 @@
 - 위치 공유 설정 조회 `GET /api/v1/me/location-sharing`, 변경 `PUT /api/v1/me/location-sharing` (#12) — 당사자만
   - `location_sharing` 테이블(user_id PK, enabled, changed_at). 응답의 `updatedAt`은 사용자가 마지막으로 바꾼 시각(`changed_at`)이라 한 번도 바꾸지 않았으면 `null`
   - 기본값(꺼짐)은 당사자 역할 선택 때 `RoleSelectedEvent`로 생성
+- 다른 도메인이 읽어 가는 창구 2개 — 본인 조회(`get`)로는 남의 설정을 볼 수 없어 따로 뒀다. 권한은 부르는 쪽이 이미 확인했으므로 여기서 다시 묻지 않는다
+  - `NotificationSettingsService.findFor(userId)`: messaging이 응답·무응답 푸시를 보낼지 판단할 때 쓴다(#93). 저장된 값이 없으면 기본값으로 본다
+  - `LocationSharingService.isSharingEnabled(userId)`: location·도움 요청이 좌표를 저장해도 되는지 볼 때 쓴다. 저장된 값이 없으면 꺼짐으로 본다
 - 역할 확인은 `settings.application.RoleRequirement`(역할 없음 403 `ROLE_REQUIRED`, 다른 역할 403 `ROLE_MISMATCH`) — 공통화 여부는 팀에서 정하기 전까지 이 도메인 안에만 둔다
 
 ### 후속 작업
 
-- messaging(응답 없음 판정·푸시 여부)이 읽어 갈 알림 설정 조회 메서드 — 팀 회의 후 추가
-- 위치 공유: 끌 때 마지막 위치 즉시 삭제(`location`, 호출 방식 팀 회의), 보호자에게 `settings.updated` 이벤트(SSE·`link` 구현 후), location·도움 요청이 읽어 갈 공유 여부 조회 메서드(팀 회의 후)
+- 위치 공유: 끌 때 마지막 위치 즉시 삭제(`location`, 호출 방식 팀 회의), 보호자에게 `settings.updated` 이벤트(SSE·`link` 구현 후)
 
 ## Pending Decisions
 

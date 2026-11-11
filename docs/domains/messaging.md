@@ -46,13 +46,18 @@
   - 다시 보내기는 신호의 **현재 값**으로 스냅샷을 다시 뜬다. 원래 기록은 그대로고, 신호가 지워졌으면 409 `SIGNAL_DELETED`
   - 둘 다 `Idempotency-Key` 필수 — 재시도로 신호가 두 번 울리면 안 된다
 
+- 응답·무응답 푸시 (#93). 보호자의 알림 설정(`touchResponseAlert`/`noResponseAlert`)이 켜져 있을 때만 보낸다
+  - 응답 푸시는 **첫 응답에서만** — 같은 보고가 여러 번 와도 '응답했어요'가 여러 번 울리면 안 된다
+  - 무응답 푸시는 타이머가 **판정을 실제로 쓴 기록에만** 보낸다. 판정과 터치가 동시에 들어와 판정이 지면 그 기록은 응답된 것이므로 무응답을 알리지 않는다
+  - 다른 사람(보호자)의 설정을 읽어야 해서 `NotificationSettingsService.findFor`를 거친다 — 본인 조회인 `get`은 쓸 수 없다
+
 ### 후속 작업 (해당 기능 구현 시)
 
 - `canResend`: 원래 신호가 삭제되지 않았는지 — `signal` 도메인 구현 후
 - 응답에 사용자 이름이 필요한 3개(`extend-wait`·`incoming`·`detail`) — `messages`에는 UUID만 있어 `account`에서 이름을 읽어 와야 한다. `MeService.getMe()`는 사용자가 없으면 401을 던져 제3자 조회용으로는 의미가 맞지 않으므로, account에 읽기 전용 조회를 추가하고 담당자(최용주)를 리뷰어로 지정한다
 - 신호 보내기·다시 보내기의 연결 구성원 검증(아니면 403이 아니라 404) — `link` 도메인 구현 후
 - 응답 대기 시간을 보호자의 `notification_settings.response_wait_minutes`에서 읽기 — `settings` 구현 후
-- `message.created`/`message.updated` 이벤트 발행과 푸시 — 실시간·푸시 구현 후
+- `message.created`/`message.updated` 이벤트 발행 — 푸시는 붙었고(#93) SSE 발행만 남았다
 
 ## Pending Decisions
 

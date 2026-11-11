@@ -1,5 +1,7 @@
 package com.sonulim.domain.settings.application;
 
+import java.util.UUID;
+
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +30,18 @@ public class NotificationSettingsService {
 		RoleRequirement.require(user, Role.GUARDIAN);
 		return notificationSettingsRepository.findById(user.userId())
 				.orElseGet(() -> NotificationSettings.defaults(user.userId()));
+	}
+
+	/**
+	 * 다른 도메인이 보호자의 알림 설정을 읽는 창구(#93). messaging이 "이 보호자가 알림을 켜 뒀는가"를
+	 * 알아야 하는데, {@link #get(AuthenticatedUser)}은 본인 조회라 다른 사람 설정을 볼 수 없다.
+	 *
+	 * <p>권한은 부르는 쪽이 이미 확인했으므로 여기서 다시 묻지 않는다.
+	 * 저장된 값이 없으면 기본값으로 본다 — 역할을 고르면 기본값이 만들어지므로 보통은 있다.
+	 */
+	public NotificationSettings findFor(UUID userId) {
+		return notificationSettingsRepository.findById(userId)
+				.orElseGet(() -> NotificationSettings.defaults(userId));
 	}
 
 	/**

@@ -11,6 +11,10 @@ import com.sonulim.domain.messaging.domain.Message;
 import com.sonulim.domain.messaging.domain.MessageRepository;
 import com.sonulim.global.exception.ErrorCode;
 import com.sonulim.global.exception.SonulimException;
+import com.sonulim.domain.settings.application.NotificationSettingsService;
+import com.sonulim.global.push.PushMessage;
+import com.sonulim.global.push.PushSender;
+import com.sonulim.global.push.PushType;
 import com.sonulim.global.security.AuthenticatedUser;
 
 /**
@@ -24,11 +28,16 @@ public class MessageReceiptService {
 
 	private final MessageRepository messageRepository;
 	private final MessagingProperties properties;
+	private final NotificationSettingsService notificationSettingsService;
+	private final PushSender pushSender;
 	private final Clock clock;
 
-	public MessageReceiptService(MessageRepository messageRepository, MessagingProperties properties, Clock clock) {
+	public MessageReceiptService(MessageRepository messageRepository, MessagingProperties properties,
+			NotificationSettingsService notificationSettingsService, PushSender pushSender, Clock clock) {
 		this.messageRepository = messageRepository;
 		this.properties = properties;
+		this.notificationSettingsService = notificationSettingsService;
+		this.pushSender = pushSender;
 		this.clock = clock;
 	}
 
@@ -45,16 +54,22 @@ public class MessageReceiptService {
 	}
 
 	/**
-	 * 터치 응답.
+	 * 터치 응답. 보호자가 터치 응답 알림을 켜 뒀을 때만 알린다(서버 내부 처리).
 	 *
-	 * <p>TODO 보호자에게 TOUCH_RESPONSE 푸시를 보내야 한다. "터치 응답 알림이 켜져 있으면"이 조건인데,
-	 *      NotificationSettingsService.get은 본인 조회용이라 보호자 설정을 읽을 창구가 없다(#71 참고).
-	 *      설정을 못 읽는 채로 보내면 꺼 둔 사람에게도 알림이 가므로 창구가 생긴 뒤 붙인다.
+	 * <p>이미 응답한 기록에 다시 와도 알림은 한 번만 간다 — 앱이 실패 시 자동으로 다시 보내기 때문이다.
 	 */
 	@Transactional
 	public Message respond(AuthenticatedUser user, UUID messageId) {
 		Message message = findForRecipient(user, messageId);
+		boolean alreadyResponded = message.getRespondedAt() != null;
 		message.respond(LocalDateTime.now(clock));
+		if (!alreadyResponded && notificationSettingsService.findFor(message.getGuardianId())
+				.isTouchResponseAlert()) {
+			pushSender.send(PushMessage.to(message.getGuardianId(), PushType.TOUCH_RESPONSE)
+					.with("messageId", message.getId().toString())
+					.with("linkId", message.getLinkId().toString())
+					.build());
+		}
 		return message;
 	}
 
