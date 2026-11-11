@@ -48,7 +48,7 @@ public class FulfillLocationService {
 	public void fulfill(AuthenticatedUser user, UUID requestId, BigDecimal latitude, BigDecimal longitude,
 			Integer accuracyM, LocalDateTime capturedAt) {
 		LocationRequest request = findOwn(user, requestId);
-		if (!locationSharingService.get(user).isEnabled()) {
+		if (!locationSharingService.isSharingEnabled(user.userId())) {
 			request.markFailed(LocationFailureReason.SHARING_OFF);
 			return;
 		}
