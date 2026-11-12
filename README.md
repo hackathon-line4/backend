@@ -21,7 +21,8 @@ docker compose up -d --build   # 처음엔 이미지 빌드로 몇 분 걸린다
 - 최신 코드 반영: `git pull` 후 `docker compose up -d --build`
 - 끄고 켜기: Docker Desktop의 `backend` 묶음에서 ■·▶︎ (또는 `docker compose stop` / `docker compose start`)
 - DB 초기화: `docker compose down -v` 후 다시 `docker compose up -d --build`
-- 푸시 알림은 실제로 보내지 않고 서버 로그에만 남는다. 실시간 이벤트(SSE)는 동작한다.
+- 푸시 알림은 기본적으로 실제로 보내지 않고 서버 로그에만 남는다. 실시간 이벤트(SSE)는 동작한다.
+  - 실제 FCM 발송: 백엔드에게 받은 서비스 계정 키를 `secret/` 폴더에 두고, `.env`에 `FIREBASE_KEY_FILE=<키 파일 이름>`을 넣은 뒤 `docker compose up -d`. 키는 절대 커밋·공유 채널에 올리지 않는다.
 - 에뮬레이터·실기기에서 접속: Android 에뮬레이터는 `http://10.0.2.2:8080`, 같은 와이파이의 실기기는 `http://<이 컴퓨터의 IP>:8080`
 
 ## 백엔드 개발

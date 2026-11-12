@@ -35,10 +35,12 @@
   - 정리용 삭제는 벌크 쿼리로 바로 실행 — Hibernate는 flush 때 insert를 delete보다 먼저 보내 `push_token` unique 제약에 걸리기 때문
   - 로그아웃하면 요청한 `installationId`의 기기 삭제(내 기기일 때만)
   - 당사자가 `GET /me`를 부르면 기기의 `last_seen_at` 갱신. 요청에 기기 정보가 없어 사용자의 기기 전체(MVP는 1대)를 갱신
+- FCM 발송용 푸시 토큰 창구 `DevicePushTokenRegistry`(`global.push.PushTokenRegistry` 구현) — 사용자의 토큰 조회, FCM이 `UNREGISTERED`로 알려 준 토큰의 기기 삭제
+  - 발송이 호출한 쪽 커밋 뒤에 일어나서 항상 새 트랜잭션(`REQUIRES_NEW`)으로 실행
+  - 발송 코드(`FcmPushSender`, `FcmConfig`)는 `global.push`에 있다 — `FIREBASE_CREDENTIALS_PATH`가 있으면 실제 발송, 없으면 local/test는 로그만
 
 ### 후속 작업 (해당 기능 구현 시)
 
-- 다른 도메인용 푸시 대상 조회·무효 토큰 삭제 메서드, FCM 발송 코드(`PushSender`) 위치·담당 — 팀 회의에서 정한 뒤 추가
 - 로그아웃: 이 사용자의 SSE 연결 종료 (실시간 구현 시)
 - 역할 선택: 보호자 알림 설정 기본값, 당사자 위치 공유 기본값 생성 (settings 구현 시)
 - `MyLinksReader`: link 도메인에 "사용자 기준 연결·대기 요청 조회" 서비스가 생기면 그쪽 호출로 교체

@@ -5,21 +5,22 @@ import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 /**
- * 기기 푸시 토큰을 읽을 창구와 FCM 자격 증명이 아직 없어서, local/test에서만 보낼 내용을 로그로 남기는 임시 구현이다.
- * 실제 발송이 붙으면 이 클래스는 지운다.
+ * FCM 자격 증명 없이 띄운 local/test에서 보낼 내용을 로그로만 남긴다. 자격 증명 경로가 있으면
+ * {@link FcmPushSender}가 대신 등록된다({@link FcmConfig}).
  *
  * <p>prod에서는 절대 활성화되지 않는다 — local/test와 prod가 같이 켜진 상태에서도 마찬가지다.
- * 그래서 prod 배포에서는 이 빈이 없어 PushSender를 필요로 하는 서비스가 뜨지 못하고 기동이 실패한다
- * ({@code DevelopmentLinkAccessGuard}와 같은 방식).
+ * 그래서 자격 증명 없는 prod 배포에서는 PushSender가 없어 기동이 실패한다 — 푸시가 조용히 안 나가는 일이 없도록 막아 둔다.
  *
  * <p>보낸 내용을 테스트에서 확인할 수 있도록 기록해 둔다.
  */
 @Component
 @Profile("(local | test) & !prod")
+@ConditionalOnExpression("'${sonulim.firebase.credentials-path:}'.isBlank()")
 public class LoggingPushSender implements PushSender {
 
 	private static final Logger log = LoggerFactory.getLogger(LoggingPushSender.class);

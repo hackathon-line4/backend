@@ -38,3 +38,6 @@ Thumbs.db
 
 ### Local-only planning docs (not shared to the team repo) ###
 docs/superpowers/
+
+### Secrets (Firebase 서비스 계정 키 등) ###
+secret/
