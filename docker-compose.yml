@@ -27,7 +27,6 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      # 로컬 설정. 푸시는 실제로 보내지 않고 로그로만 남는다.
       SPRING_PROFILES_ACTIVE: local
       # local 설정의 localhost 대신 postgres 컨테이너로 접속한다.
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-sonulim}
@@ -35,6 +34,11 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-sonulim}
       # 비어 있으면 로컬 개발용 키를 쓴다(32바이트 이상).
       JWT_SECRET: ${JWT_SECRET:-local-dev-only-jwt-secret-do-not-use-in-prod-0123456789}
+      # FCM 실제 발송(선택): secret/ 폴더에 서비스 계정 키를 두고 .env에 FIREBASE_KEY_FILE=<파일 이름>을 넣는다.
+      # 비워 두면 푸시는 보내지 않고 서버 로그로만 남는다.
+      FIREBASE_CREDENTIALS_PATH: ${FIREBASE_KEY_FILE:+/app/secret/}${FIREBASE_KEY_FILE:-}
+    volumes:
+      - ./secret:/app/secret:ro
     ports:
       - "${APP_PORT:-8080}:8080"
     logging:
