@@ -17,7 +17,7 @@ public record RecipientSignalResponse(UUID id, UUID linkId, RecipientSignalType 
 	public record Sender(UUID id, String name) {
 	}
 
-	static RecipientSignalResponse of(RecipientSignal signal, UserSummary sender) {
+	public static RecipientSignalResponse of(RecipientSignal signal, UserSummary sender) {
 		return new RecipientSignalResponse(signal.getId(), signal.getLinkId(), signal.getType(),
 				new Sender(signal.getSenderId(), sender == null ? null : sender.name()),
 				signal.getSentAt(), signal.getGuardianDeliveredAt(), signal.getGuardianOpenedAt());

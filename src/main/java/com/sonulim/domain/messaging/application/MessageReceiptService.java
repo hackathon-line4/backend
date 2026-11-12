@@ -30,27 +30,35 @@ public class MessageReceiptService {
 	private final MessagingProperties properties;
 	private final NotificationSettingsService notificationSettingsService;
 	private final PushSender pushSender;
+	private final MessagingEvents messagingEvents;
 	private final Clock clock;
 
 	public MessageReceiptService(MessageRepository messageRepository, MessagingProperties properties,
-			NotificationSettingsService notificationSettingsService, PushSender pushSender, Clock clock) {
+			NotificationSettingsService notificationSettingsService, PushSender pushSender,
+			MessagingEvents messagingEvents, Clock clock) {
 		this.messageRepository = messageRepository;
 		this.properties = properties;
 		this.notificationSettingsService = notificationSettingsService;
 		this.pushSender = pushSender;
+		this.messagingEvents = messagingEvents;
 		this.clock = clock;
 	}
 
 	@Transactional
 	public Message ack(AuthenticatedUser user, UUID messageId, LocalDateTime deviceReceivedAt) {
 		Message message = findForRecipient(user, messageId);
-		message.ack(LocalDateTime.now(clock), deviceReceivedAt, properties.defaultResponseWaitMinutes());
+		if (message.ack(LocalDateTime.now(clock), deviceReceivedAt, properties.defaultResponseWaitMinutes())) {
+			messagingEvents.updated(message);
+		}
 		return message;
 	}
 
 	@Transactional
 	public void reportPlayback(AuthenticatedUser user, UUID messageId, int count) {
-		findForRecipient(user, messageId).reportPlayback(count, LocalDateTime.now(clock));
+		Message message = findForRecipient(user, messageId);
+		if (message.reportPlayback(count, LocalDateTime.now(clock))) {
+			messagingEvents.updated(message);
+		}
 	}
 
 	/**
@@ -61,14 +69,14 @@ public class MessageReceiptService {
 	@Transactional
 	public Message respond(AuthenticatedUser user, UUID messageId) {
 		Message message = findForRecipient(user, messageId);
-		boolean alreadyResponded = message.getRespondedAt() != null;
-		message.respond(LocalDateTime.now(clock));
-		if (!alreadyResponded && notificationSettingsService.findFor(message.getGuardianId())
-				.isTouchResponseAlert()) {
-			pushSender.send(PushMessage.to(message.getGuardianId(), PushType.TOUCH_RESPONSE)
-					.with("messageId", message.getId().toString())
-					.with("linkId", message.getLinkId().toString())
-					.build());
+		if (message.respond(LocalDateTime.now(clock))) {
+			if (notificationSettingsService.findFor(message.getGuardianId()).isTouchResponseAlert()) {
+				pushSender.send(PushMessage.to(message.getGuardianId(), PushType.TOUCH_RESPONSE)
+						.with("messageId", message.getId().toString())
+						.with("linkId", message.getLinkId().toString())
+						.build());
+			}
+			messagingEvents.updated(message);
 		}
 		return message;
 	}

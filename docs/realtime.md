@@ -36,7 +36,9 @@ public class LinkRequestService {
 }
 ```
 
-단위 테스트에서는 `mock(RealtimeEventPublisher.class)`를 넣고 `verify(realtimeEvents).publish(...)`로 확인한다.
+`data`는 같은 상태를 보여 주는 API 응답과 같은 모양이어야 하므로(공통 데이터 형식), 발행하는 서비스가 그 도메인의 응답 DTO를 그대로 쓴다. SSE용으로 모양을 한 벌 더 두면 둘이 어긋난다 — 응답이 바뀌면 이벤트도 같이 바뀌어야 한다.
+
+단위 테스트에서는 `mock(RealtimeEventPublisher.class)`를 넣고 `verify(realtimeEvents).publish(...)`로 확인한다. 받는 사람이 틀리면 앱은 아무 반응도 하지 않으므로, 이벤트 종류와 받는 사람을 함께 확인한다(`DomainEventPublishingTest`).
 
 ## 연결 동작
 
@@ -60,7 +62,7 @@ public class LinkRequestService {
 
 ## 후속 작업
 
-- 각 도메인의 실제 발행 연결 — link(`link_request.*`, `link.updated`), messaging, recipient, location, settings. 받는 사람·시점은 명세의 이벤트 명세 표 참고.
+- 각 도메인의 실제 발행 연결 — link(`link_request.*`, `link.updated`, `connection_check.*`)와 settings(`settings.updated`)가 남았다. messaging·recipient·location은 #95에서 붙였다. 받는 사람·시점은 명세의 이벤트 명세 표 참고.
 - FCM 푸시(앱이 닫혀 있을 때) — 기기 등록(#17) 머지 후.
 - 당사자 연결을 `devices.last_seen_at`(마지막 접속 시각)으로 쓰기 — 기기 등록(#17) 머지 후.
 - 로그아웃 시 그 사용자의 SSE 연결 닫기 — account 로그아웃에서 부를 메서드를 그때 허브에 추가한다(account 담당자와 함께).

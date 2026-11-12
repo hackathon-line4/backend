@@ -39,16 +39,18 @@ public class MessageTimerScheduler {
 	private final MessagingProperties properties;
 	private final NotificationSettingsService notificationSettingsService;
 	private final PushSender pushSender;
+	private final MessagingEvents messagingEvents;
 	private final Clock clock;
 
 	public MessageTimerScheduler(MessageRepository messageRepository, MessageTimerService messageTimerService,
 			MessagingProperties properties, NotificationSettingsService notificationSettingsService,
-			PushSender pushSender, Clock clock) {
+			PushSender pushSender, MessagingEvents messagingEvents, Clock clock) {
 		this.messageRepository = messageRepository;
 		this.messageTimerService = messageTimerService;
 		this.properties = properties;
 		this.notificationSettingsService = notificationSettingsService;
 		this.pushSender = pushSender;
+		this.messagingEvents = messagingEvents;
 		this.clock = clock;
 	}
 
@@ -64,8 +66,10 @@ public class MessageTimerScheduler {
 		// 응답 없음 판정 — 판정된 건만 보호자에게 알린다(알림 켬일 때).
 		for (Message due : messageRepository
 				.findByResponseStatusAndWaitUntilLessThanEqual(ResponseStatus.WAITING, now)) {
-			if (messageTimerService.apply(due.getId(), Message::markNoResponse, now)) {
-				notifyNoResponse(due);
+			Message judged = messageTimerService.apply(due.getId(), Message::markNoResponse, now);
+			if (judged != null) {
+				notifyNoResponse(judged);
+				messagingEvents.updated(judged);
 			}
 		}
 
@@ -94,7 +98,9 @@ public class MessageTimerScheduler {
 		}
 		int changed = 0;
 		for (Message message : due) {
-			if (messageTimerService.apply(message.getId(), verdict, now)) {
+			Message judged = messageTimerService.apply(message.getId(), verdict, now);
+			if (judged != null) {
+				messagingEvents.updated(judged);
 				changed++;
 			}
 		}

@@ -41,17 +41,19 @@ public class SendMessageService {
 	private final UserQueryService userQueryService;
 	private final LinkAccessGuard linkAccessGuard;
 	private final PushSender pushSender;
+	private final MessagingEvents messagingEvents;
 	private final MessagingProperties properties;
 	private final Clock clock;
 
 	public SendMessageService(MessageRepository messageRepository, SignalQueryService signalQueryService,
 			UserQueryService userQueryService, LinkAccessGuard linkAccessGuard, PushSender pushSender,
-			MessagingProperties properties, Clock clock) {
+			MessagingEvents messagingEvents, MessagingProperties properties, Clock clock) {
 		this.messageRepository = messageRepository;
 		this.signalQueryService = signalQueryService;
 		this.userQueryService = userQueryService;
 		this.linkAccessGuard = linkAccessGuard;
 		this.pushSender = pushSender;
+		this.messagingEvents = messagingEvents;
 		this.properties = properties;
 		this.clock = clock;
 	}
@@ -96,8 +98,9 @@ public class SendMessageService {
 		catch (RuntimeException pushFailed) {
 			message.markFailed(DeliveryFailureReason.PUSH_PROVIDER_ERROR, LocalDateTime.now(clock));
 		}
-		return new MessageQueryService.MessageDetail(message, user(message.getGuardianId()),
-				user(message.getRecipientId()), true);
+		// 푸시가 실패해도 발행한다 — 앱이 열려 있으면 SSE로 먼저 닿는다.
+		UserSummary guardian = messagingEvents.created(message);
+		return new MessageQueryService.MessageDetail(message, guardian, user(message.getRecipientId()), true);
 	}
 
 	private SignalSnapshot currentSnapshot(AuthenticatedUser user, Message original) {

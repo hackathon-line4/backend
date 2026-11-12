@@ -28,10 +28,13 @@ public class LocationRequestTimeoutScheduler {
 	private static final Logger log = LoggerFactory.getLogger(LocationRequestTimeoutScheduler.class);
 
 	private final LocationRequestRepository locationRequestRepository;
+	private final LocationEvents locationEvents;
 	private final Clock clock;
 
-	public LocationRequestTimeoutScheduler(LocationRequestRepository locationRequestRepository, Clock clock) {
+	public LocationRequestTimeoutScheduler(LocationRequestRepository locationRequestRepository,
+			LocationEvents locationEvents, Clock clock) {
 		this.locationRequestRepository = locationRequestRepository;
+		this.locationEvents = locationEvents;
 		this.clock = clock;
 	}
 
@@ -43,8 +46,14 @@ public class LocationRequestTimeoutScheduler {
 		if (due.isEmpty()) {
 			return;
 		}
-		// 늦게 도착한 위치가 먼저 반영됐다면 markTimedOut이 스스로 건너뛴다.
-		int changed = (int) due.stream().filter(LocationRequest::markTimedOut).count();
+		// 늦게 도착한 위치가 먼저 반영됐다면 markTimedOut이 스스로 건너뛴다 — 그런 건은 알리지 않는다.
+		int changed = 0;
+		for (LocationRequest request : due) {
+			if (request.markTimedOut()) {
+				locationEvents.requestUpdated(request);
+				changed++;
+			}
+		}
 		log.debug("위치 요청 시간 초과: 대상 {}건 중 {}건 처리", due.size(), changed);
 	}
 }

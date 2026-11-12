@@ -31,13 +31,16 @@ public class RecipientReceiptService {
 	private final RecipientSignalRepository recipientSignalRepository;
 	private final HelpRequestRepository helpRequestRepository;
 	private final PushSender pushSender;
+	private final RecipientEvents recipientEvents;
 	private final Clock clock;
 
 	public RecipientReceiptService(RecipientSignalRepository recipientSignalRepository,
-			HelpRequestRepository helpRequestRepository, PushSender pushSender, Clock clock) {
+			HelpRequestRepository helpRequestRepository, PushSender pushSender, RecipientEvents recipientEvents,
+			Clock clock) {
 		this.recipientSignalRepository = recipientSignalRepository;
 		this.helpRequestRepository = helpRequestRepository;
 		this.pushSender = pushSender;
+		this.recipientEvents = recipientEvents;
 		this.clock = clock;
 	}
 
@@ -72,6 +75,7 @@ public class RecipientReceiptService {
 					.with("helpRequestId", request.getId().toString())
 					.with("linkId", request.getLinkId().toString())
 					.build());
+			recipientEvents.helpRequestOpened(request);
 		}
 		return firstOpen;
 	}
