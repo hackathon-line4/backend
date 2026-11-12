@@ -52,8 +52,9 @@ public class FulfillLocationService {
 			Integer accuracyM, LocalDateTime capturedAt) {
 		LocationRequest request = findOwn(user, requestId);
 		if (!locationSharingService.isSharingEnabled(user.userId())) {
-			request.markFailed(LocationFailureReason.SHARING_OFF);
-			locationEvents.requestUpdated(request);
+			if (request.markFailed(LocationFailureReason.SHARING_OFF)) {
+				locationEvents.requestUpdated(request);
+			}
 			return;
 		}
 		LastLocation last = overwriteLastLocation(user.userId(), latitude, longitude, accuracyM, capturedAt);
@@ -66,8 +67,9 @@ public class FulfillLocationService {
 	@Transactional
 	public void fail(AuthenticatedUser user, UUID requestId, LocationFailureReason reason) {
 		LocationRequest request = findOwn(user, requestId);
-		request.markFailed(reason);
-		locationEvents.requestUpdated(request);
+		if (request.markFailed(reason)) {
+			locationEvents.requestUpdated(request);
+		}
 	}
 
 	/**

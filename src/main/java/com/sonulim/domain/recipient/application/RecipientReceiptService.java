@@ -75,7 +75,7 @@ public class RecipientReceiptService {
 					.with("helpRequestId", request.getId().toString())
 					.with("linkId", request.getLinkId().toString())
 					.build());
-			recipientEvents.helpRequestUpdated(request);
+			recipientEvents.helpRequestOpened(request);
 		}
 		return firstOpen;
 	}

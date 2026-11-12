@@ -42,14 +42,17 @@ public class RecipientEvents {
 				Map.of("helpRequest", HelpRequestResponse.of(request, user(request.getSenderId()))));
 	}
 
-	/**
-	 * 위치가 붙었거나 보호자가 열어 봤다 → <b>보호자와 당사자 둘 다</b>에게.
-	 * 당사자 앱은 이 이벤트로 '확인함'을 알고, 보호자 화면은 붙은 위치를 받는다.
-	 */
-	public void helpRequestUpdated(HelpRequest request) {
+	/** 보호자가 열어 봤다 → <b>보호자와 당사자 둘 다</b>에게. 당사자 앱은 이 이벤트로 '확인함'을 안다. */
+	public void helpRequestOpened(HelpRequest request) {
 		Object data = Map.of("helpRequest", HelpRequestResponse.of(request, user(request.getSenderId())));
 		realtimeEvents.publish(request.getGuardianId(), RealtimeEventType.HELP_REQUEST_UPDATED, data);
 		realtimeEvents.publish(request.getSenderId(), RealtimeEventType.HELP_REQUEST_UPDATED, data);
+	}
+
+	/** 위치가 붙었다 → <b>보호자</b>에게만. 당사자 본인에게 보내면 '확인함'으로 잘못 해석된다. */
+	public void helpRequestLocationAttached(HelpRequest request) {
+		realtimeEvents.publish(request.getGuardianId(), RealtimeEventType.HELP_REQUEST_UPDATED,
+				Map.of("helpRequest", HelpRequestResponse.of(request, user(request.getSenderId()))));
 	}
 
 	private UserSummary user(UUID userId) {

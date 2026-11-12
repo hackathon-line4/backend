@@ -47,16 +47,18 @@ public class MessageReceiptService {
 	@Transactional
 	public Message ack(AuthenticatedUser user, UUID messageId, LocalDateTime deviceReceivedAt) {
 		Message message = findForRecipient(user, messageId);
-		message.ack(LocalDateTime.now(clock), deviceReceivedAt, properties.defaultResponseWaitMinutes());
-		messagingEvents.updated(message);
+		if (message.ack(LocalDateTime.now(clock), deviceReceivedAt, properties.defaultResponseWaitMinutes())) {
+			messagingEvents.updated(message);
+		}
 		return message;
 	}
 
 	@Transactional
 	public void reportPlayback(AuthenticatedUser user, UUID messageId, int count) {
 		Message message = findForRecipient(user, messageId);
-		message.reportPlayback(count, LocalDateTime.now(clock));
-		messagingEvents.updated(message);
+		if (message.reportPlayback(count, LocalDateTime.now(clock))) {
+			messagingEvents.updated(message);
+		}
 	}
 
 	/**
@@ -67,16 +69,15 @@ public class MessageReceiptService {
 	@Transactional
 	public Message respond(AuthenticatedUser user, UUID messageId) {
 		Message message = findForRecipient(user, messageId);
-		boolean alreadyResponded = message.getRespondedAt() != null;
-		message.respond(LocalDateTime.now(clock));
-		if (!alreadyResponded && notificationSettingsService.findFor(message.getGuardianId())
-				.isTouchResponseAlert()) {
-			pushSender.send(PushMessage.to(message.getGuardianId(), PushType.TOUCH_RESPONSE)
-					.with("messageId", message.getId().toString())
-					.with("linkId", message.getLinkId().toString())
-					.build());
+		if (message.respond(LocalDateTime.now(clock))) {
+			if (notificationSettingsService.findFor(message.getGuardianId()).isTouchResponseAlert()) {
+				pushSender.send(PushMessage.to(message.getGuardianId(), PushType.TOUCH_RESPONSE)
+						.with("messageId", message.getId().toString())
+						.with("linkId", message.getLinkId().toString())
+						.build());
+			}
+			messagingEvents.updated(message);
 		}
-		messagingEvents.updated(message);
 		return message;
 	}
 

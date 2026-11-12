@@ -72,9 +72,9 @@ public class LocationViewService {
 		if (pending != null && isWaiting(pending)) {
 			return pending;
 		}
-		if (pending != null) {
+		if (pending != null && pending.markTimedOut()) {
 			// 기한이 지난 요청은 여기서 끝내 둔다 — 스윕을 기다리지 않고 바로 새 요청을 만들 수 있다.
-			pending.markTimedOut();
+			locationEvents.requestUpdated(pending);
 		}
 		LocationRequest request = locationRequestRepository.save(LocationRequest.open(members.linkId(),
 				members.guardianId(), members.recipientId(), LocalDateTime.now(clock), properties.requestTimeout()));

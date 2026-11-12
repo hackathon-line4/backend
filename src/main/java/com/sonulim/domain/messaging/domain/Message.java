@@ -192,25 +192,29 @@ public class Message extends BaseEntity {
 	 * 전송 실패(FAILED) 뒤의 ack는 명세에 정의가 없어 상태를 바꾸지 않는다.
 	 *
 	 * @param waitMinutes 보호자의 응답 대기 시간. 연습 신호에는 쓰이지 않는다
+	 * @return 상태가 실제로 바뀌었으면 true — 재시도로 와서 아무것도 안 바뀌었으면 false(이벤트를 또 보내지 않도록)
 	 */
-	public void ack(LocalDateTime now, LocalDateTime deviceReceivedAt, int waitMinutes) {
+	public boolean ack(LocalDateTime now, LocalDateTime deviceReceivedAt, int waitMinutes) {
 		if (deliveryStatus == DeliveryStatus.DELIVERED || deliveryStatus == DeliveryStatus.FAILED) {
-			return;
+			return false;
 		}
 		markDelivered(now);
 		this.deviceReceivedAt = deviceReceivedAt;
 		if (kind == MessageKind.SIGNAL) {
 			startWaiting(now.plusMinutes(waitMinutes));
 		}
+		return true;
 	}
 
 	/**
 	 * 진동을 몇 번 재생했는지 보고받는다. 누적 횟수이므로 지금 값보다 큰 값만 받아들인다 —
 	 * 보고가 순서 뒤바뀌어 도착해도 횟수가 줄지 않는다(진동 재생 보고 API).
+	 *
+	 * @return 횟수가 실제로 늘었으면 true — 뒤바뀌어 온 보고라 안 바뀌었으면 false
 	 */
-	public void reportPlayback(int count, LocalDateTime now) {
+	public boolean reportPlayback(int count, LocalDateTime now) {
 		if (count <= playCount) {
-			return;
+			return false;
 		}
 		boolean firstReport = playCount == 0;
 		this.playCount = count;
@@ -221,6 +225,7 @@ public class Message extends BaseEntity {
 		else {
 			findEvent(MessageEventStep.PLAYED).ifPresent(event -> event.updateCount(count));
 		}
+		return true;
 	}
 
 	/**
@@ -228,13 +233,15 @@ public class Message extends BaseEntity {
 	 *
 	 * <p>ack 없이 먼저 오면 ack도 같은 시각으로 함께 기록한다. 응답 없음 판정 뒤에 오면 late로 남긴다.
 	 * 여러 번 와도 처음 응답만 기록한다(터치 응답 API).
+	 *
+	 * @return 이번이 처음 응답이면 true — 이미 응답한 뒤 다시 오면 false
 	 */
-	public void respond(LocalDateTime now) {
+	public boolean respond(LocalDateTime now) {
 		if (kind == MessageKind.PRACTICE) {
 			throw new SonulimException(ErrorCode.MESSAGE_NOT_RESPONDABLE, "연습 신호에는 응답하지 않아도 돼요");
 		}
 		if (responseStatus == ResponseStatus.RESPONDED) {
-			return;
+			return false;
 		}
 		if (deliveredAt == null) {
 			markDelivered(now);
@@ -243,6 +250,7 @@ public class Message extends BaseEntity {
 		this.responseStatus = ResponseStatus.RESPONDED;
 		this.respondedAt = now;
 		record(MessageEventStep.RESPONDED, now);
+		return true;
 	}
 
 	/**

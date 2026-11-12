@@ -50,7 +50,7 @@ public class HelpRequestLocationService {
 				.filter(found -> found.getSenderId().equals(user.userId()))
 				.orElseThrow(() -> new SonulimException(ErrorCode.NOT_FOUND, "도움 요청을 찾을 수 없어요"));
 		request.attachLocation(status, location);
-		recipientEvents.helpRequestUpdated(request);
+		recipientEvents.helpRequestLocationAttached(request);
 		// 주소는 좌표를 주소로 바꾸는 외부 연동이 정해지면 채운다 — 그동안은 null로 둔다(명세 허용).
 		return new AttachedLocation(request, userQueryService.find(request.getSenderId()).orElse(null));
 	}
