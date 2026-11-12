@@ -99,9 +99,8 @@ public class SendMessageService {
 			message.markFailed(DeliveryFailureReason.PUSH_PROVIDER_ERROR, LocalDateTime.now(clock));
 		}
 		// 푸시가 실패해도 발행한다 — 앱이 열려 있으면 SSE로 먼저 닿는다.
-		messagingEvents.created(message);
-		return new MessageQueryService.MessageDetail(message, user(message.getGuardianId()),
-				user(message.getRecipientId()), true);
+		UserSummary guardian = messagingEvents.created(message);
+		return new MessageQueryService.MessageDetail(message, guardian, user(message.getRecipientId()), true);
 	}
 
 	private SignalSnapshot currentSnapshot(AuthenticatedUser user, Message original) {

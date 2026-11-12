@@ -38,29 +38,35 @@ public class MessagingEvents {
 	/**
 	 * 보호자가 신호·연습을 보냈다 → <b>당사자</b>에게. 앱이 열려 있으면 푸시를 기다리지 않고 바로 울릴 수 있도록
 	 * 받은 신호 조회·SIGNAL 푸시와 같은 모양(IncomingMessage)으로 보낸다.
+	 *
+	 * @return 조회한 보호자 정보 — 부르는 쪽이 응답을 또 만들 때 같은 조회를 반복하지 않도록 돌려준다
 	 */
-	public void created(Message message) {
+	public UserSummary created(Message message) {
+		UserSummary guardian = user(message.getGuardianId());
 		realtimeEvents.publish(message.getRecipientId(), RealtimeEventType.MESSAGE_CREATED,
-				Map.of("message", IncomingMessageResponse.of(message, name(message.getGuardianId()),
+				Map.of("message", IncomingMessageResponse.of(message, guardian == null ? null : guardian.name(),
 						properties.emergencyPlayback())));
+		return guardian;
 	}
 
 	/**
 	 * 기기 전달·재생 보고·응답·응답 없음·대기 연장·긴급 경고 → <b>보호자</b>에게.
 	 * 보호자 화면이 기록 하나를 그대로 갈아 끼울 수 있게 기록 전체를 보낸다.
+	 *
+	 * @return 조회한 보호자·당사자 정보 — 부르는 쪽이 응답을 또 만들 때 같은 조회를 반복하지 않도록 돌려준다
 	 */
-	public void updated(Message message) {
+	public Participants updated(Message message) {
+		UserSummary guardian = user(message.getGuardianId());
+		UserSummary recipient = user(message.getRecipientId());
 		realtimeEvents.publish(message.getGuardianId(), RealtimeEventType.MESSAGE_UPDATED,
-				Map.of("message", MessageResponse.of(message, user(message.getGuardianId()),
-						user(message.getRecipientId()))));
-	}
-
-	private String name(UUID userId) {
-		UserSummary user = user(userId);
-		return user == null ? null : user.name();
+				Map.of("message", MessageResponse.of(message, guardian, recipient)));
+		return new Participants(guardian, recipient);
 	}
 
 	private UserSummary user(UUID userId) {
 		return userQueryService.find(userId).orElse(null);
+	}
+
+	public record Participants(UserSummary guardian, UserSummary recipient) {
 	}
 }
