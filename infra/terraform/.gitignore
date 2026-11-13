@@ -1,0 +1,8 @@
+# 상태 파일에는 리소스 정보가 그대로 들어간다 — 커밋하지 않는다.
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+# 실제 값(내 IP 등)은 로컬에만. 예시는 terraform.tfvars.example
+terraform.tfvars
+*.auto.tfvars
