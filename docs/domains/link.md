@@ -42,6 +42,11 @@
   - `Link.connectionState`(`CONFIRMED`/`UNCONFIRMED`/`UNKNOWN`, Notion "공통 데이터 형식" 확정 값)·`lastConfirmedAt` 추가. 이 컬럼보다 먼저 만들어진 연결 행이 있는 DB에서도 `ddl-auto: update`가 실패하지 않도록 nullable이고, null은 `UNKNOWN`으로 읽는다. `lastConfirmedAt`은 뒤로 가지 않는다.
   - 404 `NOT_FOUND`: 연결의 구성원이 아니거나, 해제된 연결(Pending Decisions)이거나, 없는·형식이 틀린 id.
   - 잠그는 순서는 항상 연결 → 확인(비관적 락). 요청이 동시에 와도 한 연결에 `PENDING`은 하나, ack가 동시에 와도 처음 한 번만 기록.
+- **연결 확인 푸시·이벤트 (#108)** — 상대 기기에 요청이 가지 않아 항상 `UNCONFIRMED`가 되던 문제. 받는 사람·data는 Notion API 명세 기준.
+  - 새 확인을 만들 때만 요청자의 상대방(보호자가 요청하면 당사자, 당사자가 요청하면 보호자)에게 조용한 푸시 `CONNECTION_CHECK`(data `{type, checkId}`)와 SSE `connection_check.requested`(`{checkId}`). 진행 중인 확인을 돌려줄 때는 다시 보내지 않는다 — 버튼을 여러 번 눌러도 상대 기기가 여러 번 깨지 않는다.
+  - 시간 안에 온 ack로 `CONFIRMED`가 되면 보호자·당사자 둘 다에게 SSE `connection_check.updated`(`{check: ConnectionCheckResponse}`, 결과 조회 응답과 같은 모양).
+  - 늦은 ack(`LATE`)와 시간 초과(`resolveIfDue`로 `UNCONFIRMED`)는 이벤트를 보내지 않는다(Pending Decisions "연결 확인 이벤트 범위").
+  - 푸시·SSE 모두 커밋 뒤에 나간다(`PushSender`·`RealtimeEventPublisher` 동작) — 앱이 푸시를 받자마자 ack를 보내도 확인 기록이 이미 있다. SSE 발행은 `ConnectionCheckEvents`.
 - **연결 접근 검증·연결 구성원 조회 (#75)** — 다른 도메인이 쓰는 계약 `global.linkaccess.LinkAccessGuard`의 실제 구현 `LinkMembershipGuard`. 모든 프로파일에서 이것 하나만 등록된다(local/test 통과용 구현 `DevelopmentLinkAccessGuard`는 삭제 — prod 기동 실패도 없어졌다).
   - `verifyAccessible(linkId, requesterId)` — 조회·관리 API용. 연결이 없거나 구성원이 아니면 404 `NOT_FOUND`. 해제된(`ENDED`) 연결도 구성원이면 통과(조회·관리 API의 명세 오류 목록에 409가 없음, 팀 결정 #75). 지금 signal 도메인이 쓴다.
   - `requireMembers(linkId, requesterId)` — 전송 API용. 404는 같고, 구성원이지만 `ENDED`면 409 `LINK_ENDED`. 통과하면 `LinkMembers(linkId, guardianId, recipientId)`를 돌려주고 `counterpartOf(userId)`로 상대방 id를 얻는다. messaging·recipient·location 생성 API가 기록을 만들 때 쓰도록 둔 것이다(아직 호출하는 곳 없음). 이름은 사용할 도메인과 맞춰 바꿀 수 있게 `global.linkaccess` 한 곳에 모았다. 사용자 이름은 account의 `UserQueryService`(#48)로 읽는다.
@@ -71,8 +76,7 @@
   - 이 연결로 오는 전송을 `LINK_ENDED`로 막기 — `LinkAccessGuard.requireMembers`가 409를 낸다(#75). 각 생성 API(messaging·recipient·location)가 이것을 부르면 적용된다 — 각 담당자와 조율.
   - 진행 중인 `WAITING` 신호 타이머 멈추기 — messaging 도메인(조한결)과 조율.
 - 연결 확인 (#43에서 뺀 것):
-  - 상대 기기에 조용한 푸시(`CONNECTION_CHECK`) + `connection_check.requested` 이벤트, ack 뒤 요청한 쪽에 `connection_check.updated` 이벤트(SSE 허브 #39·기기 등록 #17 머지 후).
-  - 타임아웃 서버 타이머 — 지금은 아무도 그 확인을 다시 조회하거나 ack하지 않으면 연결의 `connection.state`가 `UNCONFIRMED`로 늦게 바뀐다(앱은 SSE가 없으면 2초마다 조회하므로 실제로는 바로 반영된다). 스케줄러(`global.SchedulingConfig`, messaging PR #21)가 생기면 만료 요청과 함께 붙인다.
+  - 타임아웃 서버 타이머 — 지금은 아무도 그 확인을 다시 조회하거나 ack하지 않으면 연결의 `connection.state`가 `UNCONFIRMED`로 늦게 바뀐다(앱은 SSE가 없으면 2초마다 조회하므로 실제로는 바로 반영된다). 스케줄러(`global.SchedulingConfig`, messaging PR #21)가 생기면 만료 요청과 함께 붙이고, 시간 초과 때의 `connection_check.updated`도 이때 보낸다(Pending Decisions "연결 확인 이벤트 범위").
 
 ## Pending Decisions
 
@@ -84,6 +88,10 @@
 - **해제된 연결의 연결 확인**: 명세의 연결 확인 3개 API에 해제된 연결 이야기가 없다(오류 목록은 401·404·500뿐). 요청·ack·조회 모두 404 `NOT_FOUND`로 처리한다(팀 결정, #43 — 명세의 오류 목록 안에서만 처리). L-4의 "이후 이 연결로 오는 전송은 `LINK_ENDED`"가 연결 확인도 포함하는지 — 기획 확인 필요.
 - **해제된 연결 접근 (#75)**: 전송 API(`requireMembers`)는 409 `LINK_ENDED`(L-4 "이후 이 연결로 오는 전송은 `LINK_ENDED`"), 조회·관리 API(`verifyAccessible`)는 통과(명세 오류 목록에 409 없음) — 팀 결정. 연결 확인만 404(#43, 위 항목). 해제된 연결의 기록 조회는 "연결 해제 뒤 기록" 확정에 따른다.
 - **해제와 동시에 온 전송 (#75)**: 연결 접근 검증은 잠금 없이 읽어서, 해제와 거의 같은 순간에 온 전송 하나는 지나갈 수 있다. 막아야 하면 `requireMembers`를 비관적 락으로 읽게 바꾼다 — messaging과 함께 확인 필요.
+- **연결 확인 이벤트 범위 (#108)**: `connection_check.updated`는 시간 안에 온 ack(`CONFIRMED`)에만 보낸다(팀 결정).
+  - 시간 초과로 `UNCONFIRMED`가 될 때는 보내지 않는다 — 지금은 요청·ack·조회 때 판정(`resolveIfDue`)이라 정확히 30초에 나갈 수 없다. 타이머 작업(후속 작업) 때 함께 붙인다. 그때까지 앱은 `timeoutAt` 카운트다운이나 결과 조회로 판단한다.
+  - 늦은 ack(`LATE`)는 확인 결과가 `UNCONFIRMED` 그대로라 보내지 않는다(연결의 `lastConfirmedAt`만 갱신).
+- **연결 확인 푸시의 iOS 백그라운드 전달 (#108)**: `FcmPushSender`는 모든 종류를 data-only + Android high priority로 보내고 `ApnsConfig`가 없다. iOS 앱이 백그라운드·종료 상태면 `content-available` 없는 data-only 메시지로는 깨어나지 않아, `CONNECTION_CHECK`를 받자마자 ack하는 흐름이 iOS에서는 앱이 열려 있을 때만 동작할 수 있다(`LOCATION_REQUEST`도 같음). global/push 담당(조한결) 확인 필요 — #108은 `FcmPushSender`를 건드리지 않았다.
 - **연결 확인 명세 해석 (#43)**: 아래는 명세 문장을 이렇게 해석해 구현했다(팀 확인). — 프론트 확인 필요.
   - "요청한 사람이 아닌 쪽만" ack — 요청한 사람 본인의 ack는 404 `NOT_FOUND`(명세 오류 목록에 404만 있음).
   - 타임아웃 뒤에 온 ack — 확인 결과는 `UNCONFIRMED`·`confirmedAt: null` 그대로, 연결 상태도 `UNCONFIRMED` 그대로 두고 `lastConfirmedAt`만 갱신(명세에 "lastConfirmedAt은 갱신"만 있음).

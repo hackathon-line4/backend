@@ -1,6 +1,6 @@
 # 실시간 전달 (SSE)
 
-앱이 열려 있는 동안 상태 변화를 `GET /api/v1/events`(SSE)로 밀어 준다. 연결 관리와 이벤트 발행 허브는 `global.realtime`에 있고, 각 도메인은 이 허브에 이벤트를 **발행만** 한다([architecture.md](architecture.md#실시간-전달-sse--푸시)). 앱이 닫혀 있을 때의 FCM 푸시는 아직 없다.
+앱이 열려 있는 동안 상태 변화를 `GET /api/v1/events`(SSE)로 밀어 준다. 연결 관리와 이벤트 발행 허브는 `global.realtime`에 있고, 각 도메인은 이 허브에 이벤트를 **발행만** 한다([architecture.md](architecture.md#실시간-전달-sse--푸시)). 앱이 닫혀 있을 때는 FCM 푸시(`global.push`, #105)가 전달한다.
 
 기준: Notion API 명세 `GET /api/v1/events` (#39)
 
@@ -63,6 +63,6 @@ public class LinkRequestService {
 ## 후속 작업
 
 - 각 도메인의 실제 발행 연결 — link(`link_request.*`, `link.updated`, `connection_check.*`)와 settings(`settings.updated`)가 남았다. messaging·recipient·location은 #95에서 붙였다. 받는 사람·시점은 명세의 이벤트 명세 표 참고.
-- FCM 푸시(앱이 닫혀 있을 때) — 기기 등록(#17) 머지 후.
+- FCM 푸시(앱이 닫혀 있을 때) — #105에서 구현했다(`global.push.FcmPushSender`).
 - 당사자 연결을 `devices.last_seen_at`(마지막 접속 시각)으로 쓰기 — 기기 등록(#17) 머지 후.
 - 로그아웃 시 그 사용자의 SSE 연결 닫기 — account 로그아웃에서 부를 메서드를 그때 허브에 추가한다(account 담당자와 함께).
