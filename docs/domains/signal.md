@@ -28,10 +28,13 @@
 - `RHYTHM_DUPLICATE`·`usedBy`(GET /rhythm-presets)·`PRESET_IN_USE`·같은 리듬 확인(rhythm-check) 전부 `SignalRepository.findByLinkIdAndPulses`(구 `findByLinkIdAndRhythm`)로 pulses 기준 비교하도록 통일 — CUSTOM(rhythm에서 계산)과 TEMPLATE(rhythm이 null일 수 있음)을 같은 기준으로 비교하기 위함.
 - 기본 신호 6종(`SignalTemplateCatalogSeeder`, 앱 시작 시 테이블이 비어 있으면 1회 채움) 시드 완료: 나 여기 있어·밥 먹자(DAILY), 가자·기다려·누가 왔어(OUTING), 위험해(EMERGENCY). 전부 rhythm=null, pulses는 문서 값 그대로.
 
+## 구현 완료 (리듬 프리셋 시드 데이터, #111)
+
+- **리듬 프리셋 시드 데이터** — **확정(다연, #111)**: `RhythmPresetCatalogSeeder`(`SignalTemplateCatalogSeeder`와 같은 패턴, 앱 시작 시 테이블이 비어 있으면 1회 채움)가 8종을 채운다 — SHORT/LONG 조합 `SSS`·`LSS`·`SLS`·`SSL`·`LLS`·`SLL`·`LSL`(3박자 7종)·`SSLL`(4박자 1종). 테이블/API(GET /rhythm-presets, #57) 자체는 이미 구현되어 있었고 이번엔 데이터만 채움.
+
 ## Pending Decisions
 
 - **기본 신호 템플릿 description·icon**: 이름·카테고리·pulses는 기획 확인되어 시드 완료(#61)했지만, 뜻 설명과 아이콘 값은 아직 안 받아서 null로 넣어둠. — 기획/디자인 확인 필요.
-- **리듬 프리셋 시드 데이터**: `rhythm_presets` 실제 시드 데이터(리듬 구성) 미확정 — 기획 확인 필요. 현재는 테이블/API(GET /rhythm-presets, #57)만 구현, 실제 데이터는 넣지 않음.
 - **PATCH /signals/{signalId}에서 presetId 변경 허용 여부** — **확정(eunsolee, #57 댓글)**: PRESET_IN_USE 에러 카탈로그 페이지와 PATCH 명세 페이지가 서로 어긋나는 것과 별개로, 신호 추가 플로우 디자인상 프리셋 선택은 "추가" 2단계에만 있고 "수정" 화면엔 없어 PATCH는 지금 명세(presetId 없음, 이름·설명·카테고리·아이콘·리듬만 수정) 그대로 유지하기로 함. 나중에 허용하게 되면 자기 자신이 쓰는 presetId는 제외(`rhythm-check`의 `excludeSignalId`와 같은 방식)해야 한다고 확인받음. POST /signals의 presetId 중복 사용 검증(usedBy와 동일 기준, `SignalRepository.findByLinkIdAndPulses`)은 #57에서 구현 완료. — 수정 화면 디자인이 별도로 있는지는 프론트 확인이 더 필요하다고 함(낮은 우선순위).
 - **연결 승인 시 즐겨찾기 기본값 자동 지정** — 명세에 "협의"로 표시된 미확정 정책으로, 확정 전에는 구현하지 않음. `PUT /api/v1/links/{linkId}/favorite-signals`(S-4, #53) 자체는 구현 완료.
 - **연습 완료 시점**: 당사자 기기 ack 때 '연습함'으로 처리. — 기획 확인 필요.
