@@ -137,10 +137,15 @@ public class Signal extends BaseEntity {
 		this.name = name;
 	}
 
+	/**
+	 * 리듬이 바뀌면 연습 상태를 '연습 전'으로 되돌린다 — 바뀐 리듬은 아직 당사자에게
+	 * 전달된 적이 없다(기획 확정, 이슈 #60).
+	 */
 	public void updateRhythm(List<RhythmBeat> rhythm) {
 		requireEditable();
 		this.rhythm = List.copyOf(rhythm);
 		this.pulses = RhythmBeat.toPulses(rhythm);
+		this.practicedAt = null;
 	}
 
 	public void updateDescription(String description) {

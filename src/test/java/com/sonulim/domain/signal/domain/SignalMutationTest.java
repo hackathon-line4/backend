@@ -94,4 +94,16 @@ class SignalMutationTest {
 		assertThat(signal.isPracticed()).isTrue();
 		assertThat(signal.getPracticedAt()).isEqualTo(practicedAt);
 	}
+
+	@Test
+	void updatingRhythmResetsPracticedState() {
+		Signal signal = Signal.createCustom(linkId, "이름", null, SignalCategory.CHECK, "icon",
+				List.of(RhythmBeat.SHORT, RhythmBeat.LONG));
+		signal.markPracticed(LocalDateTime.of(2026, 11, 15, 10, 0));
+
+		signal.updateRhythm(List.of(RhythmBeat.LONG, RhythmBeat.LONG, RhythmBeat.SHORT));
+
+		assertThat(signal.isPracticed()).isFalse();
+		assertThat(signal.getPracticedAt()).isNull();
+	}
 }
