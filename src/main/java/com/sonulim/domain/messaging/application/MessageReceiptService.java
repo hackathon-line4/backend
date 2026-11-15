@@ -13,11 +13,11 @@ import com.sonulim.domain.messaging.domain.MessageRepository;
 import com.sonulim.global.exception.ErrorCode;
 import com.sonulim.global.exception.SonulimException;
 import com.sonulim.domain.settings.application.NotificationSettingsService;
-import com.sonulim.domain.signal.application.SignalPracticeService;
 import com.sonulim.global.push.PushMessage;
 import com.sonulim.global.push.PushSender;
 import com.sonulim.global.push.PushType;
 import com.sonulim.global.security.AuthenticatedUser;
+import com.sonulim.global.signalpractice.SignalPracticeTracker;
 
 /**
  * 당사자 기기가 보내는 수신 보고 — 수신 확인(ack), 진동 재생 보고, 터치 응답.
@@ -33,18 +33,18 @@ public class MessageReceiptService {
 	private final NotificationSettingsService notificationSettingsService;
 	private final PushSender pushSender;
 	private final MessagingEvents messagingEvents;
-	private final SignalPracticeService signalPracticeService;
+	private final SignalPracticeTracker signalPracticeTracker;
 	private final Clock clock;
 
 	public MessageReceiptService(MessageRepository messageRepository, MessagingProperties properties,
 			NotificationSettingsService notificationSettingsService, PushSender pushSender,
-			MessagingEvents messagingEvents, SignalPracticeService signalPracticeService, Clock clock) {
+			MessagingEvents messagingEvents, SignalPracticeTracker signalPracticeTracker, Clock clock) {
 		this.messageRepository = messageRepository;
 		this.properties = properties;
 		this.notificationSettingsService = notificationSettingsService;
 		this.pushSender = pushSender;
 		this.messagingEvents = messagingEvents;
-		this.signalPracticeService = signalPracticeService;
+		this.signalPracticeTracker = signalPracticeTracker;
 		this.clock = clock;
 	}
 
@@ -54,7 +54,7 @@ public class MessageReceiptService {
 		if (message.ack(LocalDateTime.now(clock), deviceReceivedAt, properties.defaultResponseWaitMinutes())) {
 			messagingEvents.updated(message);
 			if (message.getKind() == MessageKind.PRACTICE) {
-				signalPracticeService.markPracticed(message.getSignalSnapshot().signalId(), LocalDateTime.now(clock));
+				signalPracticeTracker.markPracticed(message.getSignalSnapshot().signalId(), LocalDateTime.now(clock));
 			}
 		}
 		return message;

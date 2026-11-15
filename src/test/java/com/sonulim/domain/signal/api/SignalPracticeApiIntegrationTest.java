@@ -138,4 +138,26 @@ class SignalPracticeApiIntegrationTest {
 				.andExpect(status().isConflict())
 				.andExpect(jsonPath("$.error.code").value("LINK_ENDED"));
 	}
+
+	@Test
+	void practicingANonexistentSignalIs404() throws Exception {
+		practice(guardianToken, link.getId(), UUID.randomUUID(), UUID.randomUUID().toString())
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.error.code").value("NOT_FOUND"));
+	}
+
+	@Test
+	void practicingASignalFromAnotherLinkIs404() throws Exception {
+		// 다른 보호자-당사자 연결의 신호 — Link는 1:1이라 같은 guardian으로는 두 번째 연결을 못 만든다.
+		User otherGuardian = saveUser("g2-" + UUID.randomUUID() + "@example.com", "다른 보호자", Role.GUARDIAN);
+		User otherRecipient = saveUser("r2-" + UUID.randomUUID() + "@example.com", "다른 당사자", Role.RECIPIENT);
+		Link otherLink = linkRepository.save(Link.connect(otherGuardian.getId(), otherRecipient.getId(),
+				LocalDateTime.now()));
+		Signal otherSignal = signalRepository.save(Signal.createCustom(otherLink.getId(), "다른 신호", null,
+				SignalCategory.DAILY, "icon", List.of(RhythmBeat.SHORT, RhythmBeat.LONG)));
+
+		practice(guardianToken, link.getId(), otherSignal.getId(), UUID.randomUUID().toString())
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.error.code").value("NOT_FOUND"));
+	}
 }

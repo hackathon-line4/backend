@@ -34,8 +34,12 @@ public record IncomingMessageResponse(UUID id, MessageKind kind, boolean isEmerg
 				playbackPolicy(message, emergency), message.getWaitUntil(), message.getRequestedAt());
 	}
 
+	/**
+	 * 연습(PRACTICE)은 응답을 받지 않아 긴급 재생을 멈출 방법이 없으므로, 긴급 신호라도
+	 * 긴급 재생 정책(반복·DND 무시)을 내려주지 않는다. isEmergency 표시 자체는 그대로 둔다.
+	 */
 	private static PlaybackPolicy playbackPolicy(Message message, MessagingProperties.EmergencyPlayback emergency) {
-		if (!message.isEmergency()) {
+		if (!message.isEmergency() || message.getKind() == MessageKind.PRACTICE) {
 			return new PlaybackPolicy(null, null, false);
 		}
 		return new PlaybackPolicy(emergency.repeatIntervalSec(), emergency.maxDurationSec(), emergency.bypassDnd());

@@ -139,6 +139,17 @@ class MessageQueryApiIntegrationTest {
 	}
 
 	@Test
+	void anEmergencyPracticeDoesNotCarryTheEmergencyPlaybackPolicy() throws Exception {
+		// 연습(PRACTICE)은 응답을 받지 않아 긴급 재생을 멈출 방법이 없다 — 긴급 재생 정책을 내려주지 않는다.
+		sent(MessageKind.PRACTICE, SignalCategory.EMERGENCY);
+
+		incoming(recipientToken)
+				.andExpect(jsonPath("$.data.items[0].isEmergency").value(true))
+				.andExpect(jsonPath("$.data.items[0].playbackPolicy.repeatIntervalSec").value(nullValue()))
+				.andExpect(jsonPath("$.data.items[0].playbackPolicy.bypassDnd").value(false));
+	}
+
+	@Test
 	void aMessageThatWasAlreadyRespondedToIsNoLongerIncoming() throws Exception {
 		Message message = sent(MessageKind.SIGNAL, SignalCategory.DAILY);
 		LocalDateTime delivered = LocalDateTime.now();
