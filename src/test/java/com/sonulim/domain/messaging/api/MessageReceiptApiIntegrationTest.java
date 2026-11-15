@@ -116,9 +116,7 @@ class MessageReceiptApiIntegrationTest {
 
 	@Test
 	void ackingAPracticeMessageMarksTheSignalPracticed() throws Exception {
-		Signal signal = signalRepository.saveAndFlush(Signal.createCustom(UUID.randomUUID(), "약 먹을 시간", null,
-				com.sonulim.domain.signal.domain.SignalCategory.DAILY, "pill",
-				List.of(RhythmBeat.SHORT, RhythmBeat.SHORT, RhythmBeat.LONG)));
+		Signal signal = practiceTestSignal();
 		Message message = givenSentMessage(MessageKind.PRACTICE, signal.getId());
 
 		ack(recipientToken, message.getId(), LocalDateTime.now()).andExpect(status().isOk());
@@ -128,14 +126,30 @@ class MessageReceiptApiIntegrationTest {
 
 	@Test
 	void ackingARegularSignalMessageDoesNotTouchPracticedAt() throws Exception {
-		Signal signal = signalRepository.saveAndFlush(Signal.createCustom(UUID.randomUUID(), "약 먹을 시간", null,
-				com.sonulim.domain.signal.domain.SignalCategory.DAILY, "pill",
-				List.of(RhythmBeat.SHORT, RhythmBeat.SHORT, RhythmBeat.LONG)));
+		Signal signal = practiceTestSignal();
 		Message message = givenSentMessage(MessageKind.SIGNAL, signal.getId());
 
 		ack(recipientToken, message.getId(), LocalDateTime.now()).andExpect(status().isOk());
 
 		assertThat(signalRepository.findById(signal.getId()).orElseThrow().isPracticed()).isFalse();
+	}
+
+	@Test
+	void ackingAPracticeMessageForADeletedSignalDoesNotResurrectIt() throws Exception {
+		Signal signal = practiceTestSignal();
+		signal.softDelete();
+		signalRepository.saveAndFlush(signal);
+		Message message = givenSentMessage(MessageKind.PRACTICE, signal.getId());
+
+		ack(recipientToken, message.getId(), LocalDateTime.now()).andExpect(status().isOk());
+
+		assertThat(signalRepository.findById(signal.getId()).orElseThrow().isPracticed()).isFalse();
+	}
+
+	private Signal practiceTestSignal() {
+		return signalRepository.saveAndFlush(Signal.createCustom(UUID.randomUUID(), "약 먹을 시간", null,
+				com.sonulim.domain.signal.domain.SignalCategory.DAILY, "pill",
+				List.of(RhythmBeat.SHORT, RhythmBeat.SHORT, RhythmBeat.LONG)));
 	}
 
 	@Test

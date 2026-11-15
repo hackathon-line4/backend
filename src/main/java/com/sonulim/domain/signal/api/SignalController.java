@@ -8,9 +8,13 @@ import com.sonulim.domain.signal.application.SignalCommandService;
 import com.sonulim.domain.signal.application.SignalPracticeService;
 import com.sonulim.domain.signal.application.SignalQueryService;
 import com.sonulim.domain.signal.domain.SignalCategory;
+import com.sonulim.global.OpenApiConfig;
 import com.sonulim.global.exception.ApiResponse;
 import com.sonulim.global.idempotency.IdempotencyService;
 import com.sonulim.global.security.AuthenticatedUser;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -26,6 +30,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+@Tag(name = "신호")
+@SecurityRequirement(name = OpenApiConfig.BEARER_AUTH)
 @RestController
 @RequestMapping("/api/v1/links/{linkId}/signals")
 public class SignalController {
@@ -84,6 +90,8 @@ public class SignalController {
 		return ResponseEntity.noContent().build();
 	}
 
+	@Operation(summary = "알려주기(연습)", description = "M-4 · 보호자만. 당사자 옆에서 리듬을 연습용으로 보낸다. "
+			+ "응답을 기다리지 않고(kind: PRACTICE), 당사자 ack 때 이 신호의 연습 완료 상태가 바뀐다")
 	@PostMapping("/{signalId}/practice")
 	public ResponseEntity<ApiResponse<MessageResponse>> practice(@PathVariable UUID linkId,
 			@PathVariable UUID signalId,

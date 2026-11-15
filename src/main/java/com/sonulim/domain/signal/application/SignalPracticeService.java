@@ -45,6 +45,6 @@ public class SignalPracticeService implements SignalPracticeTracker {
 	@Override
 	@Transactional
 	public void markPracticed(UUID signalId, LocalDateTime now) {
-		signalRepository.findById(signalId).ifPresent(signal -> signal.markPracticed(now));
+		signalRepository.findByIdAndDeletedAtIsNull(signalId).ifPresent(signal -> signal.markPracticed(now));
 	}
 }

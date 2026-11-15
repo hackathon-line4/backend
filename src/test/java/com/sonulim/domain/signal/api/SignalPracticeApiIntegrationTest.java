@@ -94,6 +94,11 @@ class SignalPracticeApiIntegrationTest {
 		practice(guardianToken, link.getId(), signal.getId(), UUID.randomUUID().toString())
 				.andExpect(status().isCreated())
 				.andExpect(jsonPath("$.data.kind").value("PRACTICE"))
+				.andExpect(jsonPath("$.data.linkId").value(link.getId().toString()))
+				.andExpect(jsonPath("$.data.signal.id").value(signal.getId().toString()))
+				// kind가 PRACTICE라 응답을 기다리지 않는다는 보장은 ack 뒤에도 waitUntil이 null로
+				// 남는 ackForAPracticeSignalKeepsWaitUntilPresentButNull(MessageReceiptApiIntegrationTest)이
+				// 증명한다 — 생성 시점엔 SIGNAL도 아직 responseStatus가 null이라 이 값만으론 구분 못 한다
 				.andExpect(jsonPath("$.data.response.status").isEmpty())
 				.andExpect(jsonPath("$.data.delivery.status").value("REQUESTED"));
 
@@ -113,11 +118,14 @@ class SignalPracticeApiIntegrationTest {
 	void retryingPracticeWithTheSameKeyDoesNotBuzzTwice() throws Exception {
 		String key = UUID.randomUUID().toString();
 		String first = practice(guardianToken, link.getId(), signal.getId(), key)
+				.andExpect(status().isCreated())
 				.andReturn().getResponse().getContentAsString();
 		String retried = practice(guardianToken, link.getId(), signal.getId(), key)
+				.andExpect(status().isCreated())
 				.andReturn().getResponse().getContentAsString();
 
 		assertThat(retried).isEqualTo(first);
+		assertThat(messageRepository.count()).isEqualTo(1);
 		assertThat(pushSender.sent()).hasSize(1);
 	}
 

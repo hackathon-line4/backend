@@ -103,7 +103,10 @@ public class SendMessageService {
 	 */
 	private MessageQueryService.MessageDetail deliver(Message message) {
 		messageRepository.save(message);
-		PushType pushType = message.getKind() == MessageKind.PRACTICE ? PushType.PRACTICE : PushType.SIGNAL;
+		PushType pushType = switch (message.getKind()) {
+			case SIGNAL -> PushType.SIGNAL;
+			case PRACTICE -> PushType.PRACTICE;
+		};
 		try {
 			pushSender.send(PushMessage.to(message.getRecipientId(), pushType)
 					.with("messageId", message.getId().toString())

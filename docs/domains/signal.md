@@ -36,6 +36,7 @@
 ## 구현 완료 (신호 알려주기(연습), M-4, #60)
 
 - `POST /api/v1/links/{linkId}/signals/{signalId}/practice` — 보호자만, `Idempotency-Key` 필수. 보호자가 당사자 옆에서 리듬을 연습용으로 보낸다. 응답 모양은 messaging의 `MessageResponse`를 그대로 쓴다(명세 응답이 완전히 같음).
+  - 명세 예시는 `response: null`(필드 자체가 null)이지만, 실제 응답은 `response: {status: null, waitUntil: null, ...}`다(필드는 있고 값이 null) — 공통 규칙 "값이 없으면 필드를 빼지 않고 null로 둔다"와 기존 `SendMessageApiIntegrationTest`의 관례를 그대로 따른 것. 프론트 확인 필요.
 - `SendMessageService.send()`와 `practice()`는 `MessageKind`만 다르고 나머지 흐름(권한·연결 멤버십·신호 스냅샷·전달)은 공유한다 — `deliver()`가 `message.getKind()`로 푸시 타입(`SIGNAL`/`PRACTICE`)만 가른다.
 - **연습 완료 시점** — **확정(eunbyul0117, #60)**: 당사자 기기 ack 때 `Signal.practicedAt`을 세운다. ack는 기존 `POST /messages/{id}/ack`(모든 kind 공통)를 그대로 쓰고, `MessageReceiptService`가 `kind == PRACTICE`일 때만 `SignalPracticeTracker.markPracticed`를 부른다.
 - **긴급(EMERGENCY) 신호의 연습** — 긴급 재생 정책(10초 반복·DND 무시·최대 1분)은 연습에는 내려주지 않는다. 연습(PRACTICE)은 터치 응답 API를 막아 둬서(`MESSAGE_NOT_RESPONDABLE`) 멈출 방법이 없기 때문 — `isEmergency` 표시 자체는 그대로 둔다(기록·응답 DTO는 영향 없음). 백엔드 판단으로 반영(기획 확인 전).
