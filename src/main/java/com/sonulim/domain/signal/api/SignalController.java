@@ -3,10 +3,13 @@ package com.sonulim.domain.signal.api;
 import java.util.List;
 import java.util.UUID;
 
+import com.sonulim.domain.messaging.api.MessageResponse;
 import com.sonulim.domain.signal.application.SignalCommandService;
+import com.sonulim.domain.signal.application.SignalPracticeService;
 import com.sonulim.domain.signal.application.SignalQueryService;
 import com.sonulim.domain.signal.domain.SignalCategory;
 import com.sonulim.global.exception.ApiResponse;
+import com.sonulim.global.idempotency.IdempotencyService;
 import com.sonulim.global.security.AuthenticatedUser;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -29,10 +32,15 @@ public class SignalController {
 
 	private final SignalQueryService signalQueryService;
 	private final SignalCommandService signalCommandService;
+	private final SignalPracticeService signalPracticeService;
+	private final IdempotencyService idempotencyService;
 
-	public SignalController(SignalQueryService signalQueryService, SignalCommandService signalCommandService) {
+	public SignalController(SignalQueryService signalQueryService, SignalCommandService signalCommandService,
+			SignalPracticeService signalPracticeService, IdempotencyService idempotencyService) {
 		this.signalQueryService = signalQueryService;
 		this.signalCommandService = signalCommandService;
+		this.signalPracticeService = signalPracticeService;
+		this.idempotencyService = idempotencyService;
 	}
 
 	@GetMapping
@@ -74,6 +82,16 @@ public class SignalController {
 			@AuthenticationPrincipal AuthenticatedUser user) {
 		signalCommandService.delete(linkId, signalId, user.userId(), user.role());
 		return ResponseEntity.noContent().build();
+	}
+
+	@PostMapping("/{signalId}/practice")
+	public ResponseEntity<ApiResponse<MessageResponse>> practice(@PathVariable UUID linkId,
+			@PathVariable UUID signalId,
+			@RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey,
+			@AuthenticationPrincipal AuthenticatedUser user) {
+		MessageResponse response = idempotencyService.execute(user.userId(), idempotencyKey, signalId,
+				MessageResponse.class, () -> signalPracticeService.practice(user, linkId, signalId));
+		return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
 	}
 
 	@PostMapping("/rhythm-check")
