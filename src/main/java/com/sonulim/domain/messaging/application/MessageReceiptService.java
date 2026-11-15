@@ -51,10 +51,12 @@ public class MessageReceiptService {
 	@Transactional
 	public Message ack(AuthenticatedUser user, UUID messageId, LocalDateTime deviceReceivedAt) {
 		Message message = findForRecipient(user, messageId);
-		if (message.ack(LocalDateTime.now(clock), deviceReceivedAt, properties.defaultResponseWaitMinutes())) {
+		LocalDateTime now = LocalDateTime.now(clock);
+		if (message.ack(now, deviceReceivedAt, properties.defaultResponseWaitMinutes())) {
 			messagingEvents.updated(message);
 			if (message.getKind() == MessageKind.PRACTICE) {
-				signalPracticeTracker.markPracticed(message.getSignalSnapshot().signalId(), LocalDateTime.now(clock));
+				signalPracticeTracker.markPracticed(message.getSignalSnapshot().signalId(),
+						message.getSignalSnapshot().pulses(), now);
 			}
 		}
 		return message;

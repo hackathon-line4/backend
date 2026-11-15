@@ -1,6 +1,7 @@
 package com.sonulim.domain.signal.application;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -41,10 +42,16 @@ public class SignalPracticeService implements SignalPracticeTracker {
 	/**
 	 * 당사자 ack 때 messaging이 부른다(연습 완료 시점, 이슈 #60에서 확정). 신호가 지워졌어도
 	 * ack 자체는 실패하면 안 되므로 조용히 무시한다.
+	 *
+	 * <p>ack된 메시지의 스냅샷 pulses가 신호의 현재 pulses와 다르면 세우지 않는다 — 연습을
+	 * 보낸 뒤 ack 전에 리듬이 바뀌면(그사이 '연습 전'으로 되돌아감) 늦게 온 ack는 실제로
+	 * 전달되지 않은 새 리듬을 연습한 것처럼 보이게 하기 때문이다(#60 리뷰, gksruf22).
 	 */
 	@Override
 	@Transactional
-	public void markPracticed(UUID signalId, LocalDateTime now) {
-		signalRepository.findByIdAndDeletedAtIsNull(signalId).ifPresent(signal -> signal.markPracticed(now));
+	public void markPracticed(UUID signalId, List<Integer> practicedPulses, LocalDateTime now) {
+		signalRepository.findByIdAndDeletedAtIsNull(signalId)
+				.filter(signal -> signal.getPulses().equals(practicedPulses))
+				.ifPresent(signal -> signal.markPracticed(now));
 	}
 }

@@ -125,6 +125,18 @@ class MessageReceiptApiIntegrationTest {
 	}
 
 	@Test
+	void aLateAckForARhythmThatWasAlreadyChangedDoesNotMarkPracticed() throws Exception {
+		Signal signal = practiceTestSignal();
+		Message message = givenSentMessage(MessageKind.PRACTICE, signal.getId());
+		signal.updateRhythm(List.of(RhythmBeat.LONG, RhythmBeat.LONG));
+		signalRepository.saveAndFlush(signal);
+
+		ack(recipientToken, message.getId(), LocalDateTime.now()).andExpect(status().isOk());
+
+		assertThat(signalRepository.findById(signal.getId()).orElseThrow().isPracticed()).isFalse();
+	}
+
+	@Test
 	void ackingARegularSignalMessageDoesNotTouchPracticedAt() throws Exception {
 		Signal signal = practiceTestSignal();
 		Message message = givenSentMessage(MessageKind.SIGNAL, signal.getId());

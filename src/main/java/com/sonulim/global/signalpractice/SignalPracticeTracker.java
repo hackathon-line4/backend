@@ -1,6 +1,7 @@
 package com.sonulim.global.signalpractice;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -11,5 +12,10 @@ import java.util.UUID;
  */
 public interface SignalPracticeTracker {
 
-	void markPracticed(UUID signalId, LocalDateTime at);
+	/**
+	 * @param practicedPulses ack된 메시지의 스냅샷 pulses — 당사자 기기가 실제로 울린 값이다.
+	 *                        신호의 <b>현재</b> pulses와 다르면(리듬이 그사이 바뀌었으면) 세우지 않는다 —
+	 *                        늦게 온 ack가 바뀐 리듬을 연습한 것처럼 보이게 하지 않기 위해서다(#60 리뷰).
+	 */
+	void markPracticed(UUID signalId, List<Integer> practicedPulses, LocalDateTime at);
 }
