@@ -62,7 +62,7 @@ public class LinkRequestService {
 
 ## 후속 작업
 
-- 각 도메인의 실제 발행 연결 — link(`link_request.*`, `link.updated`, `connection_check.*`)와 settings(`settings.updated`)가 남았다. messaging·recipient·location은 #95에서 붙였다. 받는 사람·시점은 명세의 이벤트 명세 표 참고.
+- 각 도메인의 실제 발행 연결 — link(`link_request.*`, `link.updated`)와 settings(`settings.updated`)가 남았다. messaging·recipient·location은 #95, link의 `connection_check.*`는 #108에서 붙였다. 받는 사람·시점은 명세의 이벤트 명세 표 참고.
 - FCM 푸시(앱이 닫혀 있을 때) — #105에서 구현했다(`global.push.FcmPushSender`).
 - 당사자 연결을 `devices.last_seen_at`(마지막 접속 시각)으로 쓰기 — 기기 등록(#17) 머지 후.
 - 로그아웃 시 그 사용자의 SSE 연결 닫기 — account 로그아웃에서 부를 메서드를 그때 허브에 추가한다(account 담당자와 함께).
