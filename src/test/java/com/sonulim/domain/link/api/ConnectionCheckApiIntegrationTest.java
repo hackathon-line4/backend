@@ -13,6 +13,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -29,6 +31,9 @@ import org.springframework.transaction.annotation.Transactional;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jayway.jsonpath.JsonPath;
 import com.sonulim.domain.link.api.LinkCodeTestConfig.ScriptedLinkCodeGenerator;
+import com.sonulim.global.push.LoggingPushSender;
+import com.sonulim.global.push.PushMessage;
+import com.sonulim.global.push.PushType;
 import com.sonulim.support.MutableClock;
 
 /**
@@ -52,12 +57,51 @@ class ConnectionCheckApiIntegrationTest {
 	@Autowired
 	private ScriptedLinkCodeGenerator generator;
 
+	@Autowired
+	private LoggingPushSender pushSender;
+
 	private LinkApiTestSupport support;
 
 	@BeforeEach
 	void setUp() {
 		support = new LinkApiTestSupport(mockMvc, objectMapper);
 		generator.reset();
+		pushSender.clear();
+	}
+
+	// 상대 앱이 푸시를 받자마자 ack를 보낼 수 있게 checkId만 담는다(프론트 요청: data는 {type, checkId}).
+	@Test
+	void guardianRequestWakesRecipientDeviceWithCheckId() throws Exception {
+		Linked linked = link("cc-push");
+
+		String checkId = checkId(linked.guardian(), linked.linkId());
+
+		assertThat(connectionCheckPushes()).singleElement().satisfies(push -> {
+			assertThat(push.recipientUserId()).isEqualTo(UUID.fromString(support.userId(linked.recipient())));
+			assertThat(push.data()).isEqualTo(Map.of("type", "CONNECTION_CHECK", "checkId", checkId));
+		});
+	}
+
+	@Test
+	void recipientRequestWakesGuardianDevice() throws Exception {
+		Linked linked = link("cc-rpush");
+
+		checkId(linked.recipient(), linked.linkId());
+
+		assertThat(connectionCheckPushes()).singleElement().satisfies(push ->
+				assertThat(push.recipientUserId()).isEqualTo(UUID.fromString(support.userId(linked.guardian()))));
+	}
+
+	// 진행 중인 확인을 돌려줄 때는 상대 기기를 다시 깨우지 않는다.
+	@Test
+	void reusedPendingCheckSendsNoSecondPush() throws Exception {
+		Linked linked = link("cc-repush");
+		checkId(linked.guardian(), linked.linkId());
+
+		checkId(linked.recipient(), linked.linkId());
+		checkId(linked.guardian(), linked.linkId());
+
+		assertThat(connectionCheckPushes()).hasSize(1);
 	}
 
 	@Test
@@ -252,6 +296,10 @@ class ConnectionCheckApiIntegrationTest {
 				.andExpect(status().isOk())
 				.andReturn().getResponse().getContentAsString();
 		return new Linked(guardian, recipient, requestId, JsonPath.read(body, "$.data.link.id"));
+	}
+
+	private List<PushMessage> connectionCheckPushes() {
+		return pushSender.sent().stream().filter(push -> push.type() == PushType.CONNECTION_CHECK).toList();
 	}
 
 	private String checkId(String accessToken, String linkId) throws Exception {
