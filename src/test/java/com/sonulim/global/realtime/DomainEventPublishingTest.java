@@ -18,6 +18,11 @@ import org.springframework.boot.test.mock.mockito.SpyBean;
 import com.sonulim.domain.account.domain.Role;
 import com.sonulim.domain.account.domain.User;
 import com.sonulim.domain.account.domain.UserRepository;
+import com.sonulim.domain.link.api.ConnectionCheckResponse;
+import com.sonulim.domain.link.application.ConnectionCheckService;
+import com.sonulim.domain.link.domain.ConnectionCheck;
+import com.sonulim.domain.link.domain.ConnectionCheckRepository;
+import com.sonulim.domain.link.domain.ConnectionCheckStatus;
 import com.sonulim.domain.link.domain.Link;
 import com.sonulim.domain.link.domain.LinkRepository;
 import com.sonulim.domain.location.application.FulfillLocationService;
@@ -50,7 +55,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 /**
- * 내 도메인(messaging·recipient·location)이 SSE 이벤트를 <b>누구에게</b> 보내는지 확인한다.
+ * 각 도메인(messaging·recipient·location·link)이 SSE 이벤트를 <b>누구에게</b> 보내는지 확인한다.
  * 받는 사람과 data의 키는 API 명세의 이벤트 명세 표 그대로여야 한다 — 틀리면 앱이 아무 반응도 하지 않는다.
  */
 @SpringBootTest
@@ -65,6 +70,7 @@ class DomainEventPublishingTest {
 	@Autowired private LocationViewService locationViewService;
 	@Autowired private FulfillLocationService fulfillLocationService;
 	@Autowired private LocationRequestTimeoutScheduler locationRequestTimeoutScheduler;
+	@Autowired private ConnectionCheckService connectionCheckService;
 
 	@Autowired private MessageRepository messageRepository;
 	@Autowired private RecipientSignalRepository recipientSignalRepository;
@@ -73,6 +79,7 @@ class DomainEventPublishingTest {
 	@Autowired private LastLocationRepository lastLocationRepository;
 	@Autowired private LocationSharingRepository locationSharingRepository;
 	@Autowired private LinkRepository linkRepository;
+	@Autowired private ConnectionCheckRepository connectionCheckRepository;
 	@Autowired private SignalRepository signalRepository;
 	@Autowired private UserRepository userRepository;
 
@@ -194,6 +201,52 @@ class DomainEventPublishingTest {
 				.containsKey("locationRequest");
 	}
 
+	@Test
+	void aConnectionCheckTellsOnlyTheOtherSideWhichCheckToAck() {
+		ConnectionCheck check = connectionCheckService.request(asGuardian, link.getId().toString());
+
+		assertThat(dataOf(recipient.getId(), RealtimeEventType.CONNECTION_CHECK_REQUESTED))
+				.isEqualTo(Map.of("checkId", check.getId()));
+		verify(realtimeEvents, never()).publish(eq(guardian.getId()),
+				eq(RealtimeEventType.CONNECTION_CHECK_REQUESTED), any());
+	}
+
+	@Test
+	void aRecipientsConnectionCheckTellsTheGuardian() {
+		ConnectionCheck check = connectionCheckService.request(asRecipient, link.getId().toString());
+
+		assertThat(dataOf(guardian.getId(), RealtimeEventType.CONNECTION_CHECK_REQUESTED))
+				.containsEntry("checkId", check.getId());
+	}
+
+	/** 양쪽 화면이 모두 '연결 확인됨'으로 바뀌어야 한다 — 명세의 data 키는 check다. */
+	@Test
+	void anAckInTimeTellsBothSides() {
+		ConnectionCheck check = connectionCheckService.request(asGuardian, link.getId().toString());
+
+		connectionCheckService.ack(asRecipient, check.getId().toString());
+
+		for (UUID userId : List.of(guardian.getId(), recipient.getId())) {
+			assertThat(dataOf(userId, RealtimeEventType.CONNECTION_CHECK_UPDATED).get("check"))
+					.isInstanceOfSatisfying(ConnectionCheckResponse.class, response -> {
+						assertThat(response.id()).isEqualTo(check.getId());
+						assertThat(response.status()).isEqualTo(ConnectionCheckStatus.CONFIRMED);
+					});
+		}
+	}
+
+	/** 늦은 ack와 시간 초과는 결과가 UNCONFIRMED 그대로라 보내지 않는다(Pending Decisions — 타이머 작업 때). */
+	@Test
+	void aLateAckOrTimeoutTellsNobody() {
+		ConnectionCheck check = connectionCheckRepository.save(ConnectionCheck.request(link.getId(),
+				guardian.getId(), LocalDateTime.now().minusMinutes(5)));
+
+		connectionCheckService.get(asGuardian, check.getId().toString());
+		connectionCheckService.ack(asRecipient, check.getId().toString());
+
+		verify(realtimeEvents, never()).publish(any(), eq(RealtimeEventType.CONNECTION_CHECK_UPDATED), any());
+	}
+
 	/** 발행된 data를 꺼낸다 — 받는 사람과 이벤트 종류가 함께 맞아야 통과한다. */
 	@SuppressWarnings("unchecked")
 	private Map<String, Object> dataOf(UUID userId, RealtimeEventType type) {
@@ -209,6 +262,7 @@ class DomainEventPublishingTest {
 		locationRequestRepository.deleteAll();
 		lastLocationRepository.deleteAll();
 		signalRepository.deleteAll();
+		connectionCheckRepository.deleteAll();
 		linkRepository.deleteAll();
 	}
 

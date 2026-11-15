@@ -9,7 +9,7 @@ import com.sonulim.domain.link.domain.ConnectionCheckStatus;
 public record ConnectionCheckResponse(UUID id, ConnectionCheckStatus status, UUID requestedBy,
 		LocalDateTime requestedAt, LocalDateTime confirmedAt, LocalDateTime timeoutAt) {
 
-	static ConnectionCheckResponse from(ConnectionCheck check) {
+	public static ConnectionCheckResponse from(ConnectionCheck check) {
 		return new ConnectionCheckResponse(check.getId(), check.getStatus(), check.getRequestedBy(),
 				check.getRequestedAt(), check.getConfirmedAt(), check.getTimeoutAt());
 	}
