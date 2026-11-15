@@ -1,8 +1,11 @@
 package com.sonulim.domain.signal.api;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
+import com.jayway.jsonpath.JsonPath;
 import com.sonulim.domain.signal.domain.RhythmBeat;
 import com.sonulim.domain.signal.domain.RhythmPreset;
 import com.sonulim.domain.signal.domain.RhythmPresetRepository;
@@ -20,6 +23,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -55,29 +59,44 @@ class RhythmPresetControllerTest {
 	@Test
 	void reportsUsedByNullWhenNoSignalUsesThatRhythm() throws Exception {
 		UUID linkId = UUID.randomUUID();
-		rhythmPresetRepository.saveAndFlush(new RhythmPreset(List.of(RhythmBeat.SHORT, RhythmBeat.SHORT)));
+		// MVP 프리셋 8종엔 없는 조합을 써서 RhythmPresetCatalogSeeder가 채운 데이터와 안 겹치게 한다.
+		RhythmPreset preset = rhythmPresetRepository
+				.saveAndFlush(new RhythmPreset(List.of(RhythmBeat.MEDIUM, RhythmBeat.MEDIUM)));
 
-		mockMvc.perform(get("/api/v1/rhythm-presets")
+		String body = mockMvc.perform(get("/api/v1/rhythm-presets")
 						.queryParam("linkId", linkId.toString())
 						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID(), "GUARDIAN")))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.data.items[0].rhythm[0]").value("SHORT"))
-				.andExpect(jsonPath("$.data.items[0].usedBy").doesNotExist());
+				.andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+
+		Map<String, Object> item = itemWithId(body, preset.getId());
+		assertThat((List<Object>) item.get("rhythm")).containsExactly("MEDIUM", "MEDIUM");
+		assertThat(item.get("usedBy")).isNull();
 	}
 
 	@Test
 	void reportsUsedByTheConflictingSignal() throws Exception {
 		UUID linkId = UUID.randomUUID();
-		rhythmPresetRepository.saveAndFlush(new RhythmPreset(List.of(RhythmBeat.LONG, RhythmBeat.LONG)));
+		RhythmPreset preset = rhythmPresetRepository
+				.saveAndFlush(new RhythmPreset(List.of(RhythmBeat.LONG, RhythmBeat.LONG)));
 		Signal signal = signalRepository.saveAndFlush(Signal.createCustom(linkId, "가자", null, SignalCategory.OUTING,
 				"icon", List.of(RhythmBeat.LONG, RhythmBeat.LONG)));
 
-		mockMvc.perform(get("/api/v1/rhythm-presets")
+		String body = mockMvc.perform(get("/api/v1/rhythm-presets")
 						.queryParam("linkId", linkId.toString())
 						.header(HttpHeaders.AUTHORIZATION, bearerTokenFor(UUID.randomUUID(), "GUARDIAN")))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.data.items[0].usedBy.signalId").value(signal.getId().toString()))
-				.andExpect(jsonPath("$.data.items[0].usedBy.name").value("가자"));
+				.andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+
+		Map<?, ?> usedBy = (Map<?, ?>) itemWithId(body, preset.getId()).get("usedBy");
+		assertThat(usedBy.get("signalId")).isEqualTo(signal.getId().toString());
+		assertThat(usedBy.get("name")).isEqualTo("가자");
+	}
+
+	/** rhythm_presets는 전역 카탈로그라 응답에 이 테스트가 만든 것 말고도 다른 프리셋이 섞여 있다. */
+	private Map<String, Object> itemWithId(String body, UUID id) {
+		List<Map<String, Object>> items = JsonPath.read(body, "$.data.items");
+		return items.stream().filter(item -> id.toString().equals(item.get("id"))).findFirst().orElseThrow();
 	}
 
 	@Test

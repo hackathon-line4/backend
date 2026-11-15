@@ -16,7 +16,7 @@
   - 리듬이 이 연결의 기존 신호와 겹치면 `RHYTHM_DUPLICATE`를 던지고 `@Transactional`로 그 호출에서 만든 것 전부 롤백한다 — 일부만 만들어진 상태가 남지 않는다.
   - `signal_templates` 시드 데이터는 `SignalTemplateCatalogSeeder`가 앱 시작 시 채운다(#61) — 기본 신호 6종.
   - link 쪽 연결(승인 로직에서 실제 호출)과 트랜잭션 경계(승인과 묶을지 베스트 에포트로 할지)는 link 담당자와 별도로 정한다.
-- **`global.signalpractice.SignalPracticeTracker`**(#60) — `void markPracticed(UUID signalId, LocalDateTime at)`. 연습 신호(PRACTICE) ack 때 messaging(`MessageReceiptService`)이 호출하면, 그 신호의 `practicedAt`을 세운다(`SignalPracticeService`가 구현). `DefaultSignalSeeder`와 같은 패턴 — signal이 정의·구현, messaging은 인터페이스만 의존해 패키지 양방향 직접 의존을 피한다.
+- **`global.signalpractice.SignalPracticeTracker`**(#60) — `void markPracticed(UUID signalId, List<Integer> practicedPulses, LocalDateTime at)`. 연습 신호(PRACTICE) ack 때 messaging(`MessageReceiptService`)이 호출하면, 그 신호의 `practicedAt`을 세운다(`SignalPracticeService`가 구현). `DefaultSignalSeeder`와 같은 패턴 — signal이 정의·구현, messaging은 인터페이스만 의존해 패키지 양방향 직접 의존을 피한다. `practicedPulses`(ack된 메시지의 스냅샷 pulses)가 신호의 현재 pulses와 다르면 세우지 않는다 — 아래 "늦게 온 ack 보호" 참고.
 
 ## signal이 쓰는 다른 도메인의 계약
 
@@ -40,12 +40,16 @@
 - `SendMessageService.send()`와 `practice()`는 `MessageKind`만 다르고 나머지 흐름(권한·연결 멤버십·신호 스냅샷·전달)은 공유한다 — `deliver()`가 `message.getKind()`로 푸시 타입(`SIGNAL`/`PRACTICE`)만 가른다.
 - **연습 완료 시점** — **확정(eunbyul0117, #60)**: 당사자 기기 ack 때 `Signal.practicedAt`을 세운다. ack는 기존 `POST /messages/{id}/ack`(모든 kind 공통)를 그대로 쓰고, `MessageReceiptService`가 `kind == PRACTICE`일 때만 `SignalPracticeTracker.markPracticed`를 부른다.
 - **긴급(EMERGENCY) 신호의 연습** — 긴급 재생 정책(10초 반복·DND 무시·최대 1분)은 연습에는 내려주지 않는다. 연습(PRACTICE)은 터치 응답 API를 막아 둬서(`MESSAGE_NOT_RESPONDABLE`) 멈출 방법이 없기 때문 — `isEmergency` 표시 자체는 그대로 둔다(기록·응답 DTO는 영향 없음). 백엔드 판단으로 반영(기획 확인 전).
-- **리듬 수정 시 연습 여부** — **확정(다연, #60)**: 리듬을 수정하면 연습 상태를 '연습 전'으로 되돌린다(`Signal.updateRhythm`이 `practicedAt`을 `null`로 비움). 리듬 수정 전에 보낸 연습 요청의 ack가 수정 후에 늦게 와도 그 ack 시각 그대로 다시 '연습함'이 된다(별도 분기 없음) — 문제가 되면 추가 Pending Decision으로 남긴다.
+- **리듬 수정 시 연습 여부** — **확정(다연, #60)**: 리듬을 수정하면 연습 상태를 '연습 전'으로 되돌린다(`Signal.updateRhythm`이 `practicedAt`을 `null`로 비운다).
+  - **늦게 온 ack 보호** — **반영(#60 리뷰, gksruf22)**: 리듬 수정 전에 보낸 연습 요청의 ack가 수정 후에 늦게 오면, `SignalPracticeTracker.markPracticed`가 ack된 메시지의 스냅샷 pulses와 신호의 **현재** pulses를 비교해 다르면 `practicedAt`을 세우지 않는다 — 바뀐 리듬은 실제로 전달된 적이 없기 때문이다.
+
+## 구현 완료 (리듬 프리셋 시드 데이터, #111)
+
+- **리듬 프리셋 시드 데이터** — **확정(다연, #111)**: `RhythmPresetCatalogSeeder`(`SignalTemplateCatalogSeeder`와 같은 패턴, 앱 시작 시 테이블이 비어 있으면 1회 채움)가 8종을 채운다 — SHORT/LONG 조합 `SSS`·`LSS`·`SLS`·`SSL`·`LLS`·`SLL`·`LSL`(3박자 7종)·`SSLL`(4박자 1종). 테이블/API(GET /rhythm-presets, #57) 자체는 이미 구현되어 있었고 이번엔 데이터만 채움.
 
 ## Pending Decisions
 
 - **기본 신호 템플릿 description·icon**: 이름·카테고리·pulses는 기획 확인되어 시드 완료(#61)했지만, 뜻 설명과 아이콘 값은 아직 안 받아서 null로 넣어둠. — 기획/디자인 확인 필요.
-- **리듬 프리셋 시드 데이터**: `rhythm_presets` 실제 시드 데이터(리듬 구성) 미확정 — 기획 확인 필요. 현재는 테이블/API(GET /rhythm-presets, #57)만 구현, 실제 데이터는 넣지 않음.
 - **PATCH /signals/{signalId}에서 presetId 변경 허용 여부** — **확정(eunsolee, #57 댓글)**: PRESET_IN_USE 에러 카탈로그 페이지와 PATCH 명세 페이지가 서로 어긋나는 것과 별개로, 신호 추가 플로우 디자인상 프리셋 선택은 "추가" 2단계에만 있고 "수정" 화면엔 없어 PATCH는 지금 명세(presetId 없음, 이름·설명·카테고리·아이콘·리듬만 수정) 그대로 유지하기로 함. 나중에 허용하게 되면 자기 자신이 쓰는 presetId는 제외(`rhythm-check`의 `excludeSignalId`와 같은 방식)해야 한다고 확인받음. POST /signals의 presetId 중복 사용 검증(usedBy와 동일 기준, `SignalRepository.findByLinkIdAndPulses`)은 #57에서 구현 완료. — 수정 화면 디자인이 별도로 있는지는 프론트 확인이 더 필요하다고 함(낮은 우선순위).
 - **연결 승인 시 즐겨찾기 기본값 자동 지정** — 명세에 "협의"로 표시된 미확정 정책으로, 확정 전에는 구현하지 않음. `PUT /api/v1/links/{linkId}/favorite-signals`(S-4, #53) 자체는 구현 완료.
 - **긴급 신호 연습 시 재생 정책 제외** — 위 "구현 완료" 항목에 백엔드 판단으로 반영했지만 기획 확인은 아직 못 받음. — 기획 확인 필요.
