@@ -124,6 +124,10 @@ public class Signal extends BaseEntity {
 		return practicedAt != null;
 	}
 
+	public void markPracticed(LocalDateTime at) {
+		this.practicedAt = at;
+	}
+
 	/**
 	 * 기본 신호(SignalSource.TEMPLATE)는 이름·리듬을 바꿀 수 없다(SIGNAL_NOT_EDITABLE,
 	 * 에러 코드 설명 그대로). 설명·카테고리·아이콘은 기본 신호도 바꿀 수 있다.
