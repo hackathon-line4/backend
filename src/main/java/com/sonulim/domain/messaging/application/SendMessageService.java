@@ -60,12 +60,26 @@ public class SendMessageService {
 
 	@Transactional
 	public MessageQueryService.MessageDetail send(AuthenticatedUser user, UUID linkId, UUID signalId) {
+		return createAndDeliver(user, linkId, signalId, MessageKind.SIGNAL);
+	}
+
+	/**
+	 * 보호자가 당사자 옆에서 리듬을 연습용으로 보낸다(M-4). 응답을 요구하지 않는다 — Message가
+	 * kind로 응답 대기 시작 여부를 가른다.
+	 */
+	@Transactional
+	public MessageQueryService.MessageDetail practice(AuthenticatedUser user, UUID linkId, UUID signalId) {
+		return createAndDeliver(user, linkId, signalId, MessageKind.PRACTICE);
+	}
+
+	private MessageQueryService.MessageDetail createAndDeliver(AuthenticatedUser user, UUID linkId, UUID signalId,
+			MessageKind kind) {
 		MessagingRoles.requireGuardian(user);
 		LinkMembers members = linkAccessGuard.requireMembers(linkId, user.userId());
 		SignalSnapshot snapshot = SignalSnapshots.of(
 				signalQueryService.getDetail(linkId, signalId, user.userId(), user.role()));
-		return deliver(Message.send(members.linkId(), members.guardianId(), members.recipientId(),
-				MessageKind.SIGNAL, snapshot, LocalDateTime.now(clock), ackTimeout()));
+		return deliver(Message.send(members.linkId(), members.guardianId(), members.recipientId(), kind, snapshot,
+				LocalDateTime.now(clock), ackTimeout()));
 	}
 
 	/**
@@ -89,8 +103,12 @@ public class SendMessageService {
 	 */
 	private MessageQueryService.MessageDetail deliver(Message message) {
 		messageRepository.save(message);
+		PushType pushType = switch (message.getKind()) {
+			case SIGNAL -> PushType.SIGNAL;
+			case PRACTICE -> PushType.PRACTICE;
+		};
 		try {
-			pushSender.send(PushMessage.to(message.getRecipientId(), PushType.SIGNAL)
+			pushSender.send(PushMessage.to(message.getRecipientId(), pushType)
 					.with("messageId", message.getId().toString())
 					.with("linkId", message.getLinkId().toString())
 					.build());

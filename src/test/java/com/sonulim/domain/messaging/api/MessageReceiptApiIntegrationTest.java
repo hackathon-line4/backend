@@ -22,6 +22,9 @@ import com.sonulim.domain.messaging.domain.MessageRepository;
 import com.sonulim.domain.messaging.domain.ResponseStatus;
 import com.sonulim.domain.messaging.domain.SignalCategory;
 import com.sonulim.domain.messaging.domain.SignalSnapshot;
+import com.sonulim.domain.signal.domain.RhythmBeat;
+import com.sonulim.domain.signal.domain.Signal;
+import com.sonulim.domain.signal.domain.SignalRepository;
 import com.sonulim.global.security.JwtTokenProvider;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -42,6 +45,9 @@ class MessageReceiptApiIntegrationTest {
 	private MessageRepository messageRepository;
 
 	@Autowired
+	private SignalRepository signalRepository;
+
+	@Autowired
 	private JwtTokenProvider jwtTokenProvider;
 
 	private UUID guardianId;
@@ -51,14 +57,19 @@ class MessageReceiptApiIntegrationTest {
 	@BeforeEach
 	void setUp() {
 		messageRepository.deleteAll();
+		signalRepository.deleteAll();
 		guardianId = UUID.randomUUID();
 		recipientId = UUID.randomUUID();
 		recipientToken = jwtTokenProvider.createAccessToken(recipientId, "RECIPIENT");
 	}
 
 	private Message givenSentMessage(MessageKind kind) {
+		return givenSentMessage(kind, UUID.randomUUID());
+	}
+
+	private Message givenSentMessage(MessageKind kind, UUID signalId) {
 		return messageRepository.save(Message.send(UUID.randomUUID(), guardianId, recipientId, kind,
-				new SignalSnapshot(UUID.randomUUID(), "약 먹을 시간", "저녁 약을 먹자는 뜻", SignalCategory.DAILY,
+				new SignalSnapshot(signalId, "약 먹을 시간", "저녁 약을 먹자는 뜻", SignalCategory.DAILY,
 						"pill", List.of("SHORT", "SHORT", "LONG"), List.of(150, 150, 150, 150, 1000), 1900),
 				LocalDateTime.now(), Duration.ofSeconds(60)));
 	}
@@ -101,6 +112,56 @@ class MessageReceiptApiIntegrationTest {
 				// 공통 규칙: 값이 없으면 필드를 빼지 않고 null로 둔다. doesNotExist()는 둘 다 통과하므로 키 존재를 따로 본다
 				.andExpect(jsonPath("$.data", hasKey("waitUntil")))
 				.andExpect(jsonPath("$.data.waitUntil").value(nullValue()));
+	}
+
+	@Test
+	void ackingAPracticeMessageMarksTheSignalPracticed() throws Exception {
+		Signal signal = practiceTestSignal();
+		Message message = givenSentMessage(MessageKind.PRACTICE, signal.getId());
+
+		ack(recipientToken, message.getId(), LocalDateTime.now()).andExpect(status().isOk());
+
+		assertThat(signalRepository.findById(signal.getId()).orElseThrow().isPracticed()).isTrue();
+	}
+
+	@Test
+	void aLateAckForARhythmThatWasAlreadyChangedDoesNotMarkPracticed() throws Exception {
+		Signal signal = practiceTestSignal();
+		Message message = givenSentMessage(MessageKind.PRACTICE, signal.getId());
+		signal.updateRhythm(List.of(RhythmBeat.LONG, RhythmBeat.LONG));
+		signalRepository.saveAndFlush(signal);
+
+		ack(recipientToken, message.getId(), LocalDateTime.now()).andExpect(status().isOk());
+
+		assertThat(signalRepository.findById(signal.getId()).orElseThrow().isPracticed()).isFalse();
+	}
+
+	@Test
+	void ackingARegularSignalMessageDoesNotTouchPracticedAt() throws Exception {
+		Signal signal = practiceTestSignal();
+		Message message = givenSentMessage(MessageKind.SIGNAL, signal.getId());
+
+		ack(recipientToken, message.getId(), LocalDateTime.now()).andExpect(status().isOk());
+
+		assertThat(signalRepository.findById(signal.getId()).orElseThrow().isPracticed()).isFalse();
+	}
+
+	@Test
+	void ackingAPracticeMessageForADeletedSignalDoesNotResurrectIt() throws Exception {
+		Signal signal = practiceTestSignal();
+		signal.softDelete();
+		signalRepository.saveAndFlush(signal);
+		Message message = givenSentMessage(MessageKind.PRACTICE, signal.getId());
+
+		ack(recipientToken, message.getId(), LocalDateTime.now()).andExpect(status().isOk());
+
+		assertThat(signalRepository.findById(signal.getId()).orElseThrow().isPracticed()).isFalse();
+	}
+
+	private Signal practiceTestSignal() {
+		return signalRepository.saveAndFlush(Signal.createCustom(UUID.randomUUID(), "약 먹을 시간", null,
+				com.sonulim.domain.signal.domain.SignalCategory.DAILY, "pill",
+				List.of(RhythmBeat.SHORT, RhythmBeat.SHORT, RhythmBeat.LONG)));
 	}
 
 	@Test

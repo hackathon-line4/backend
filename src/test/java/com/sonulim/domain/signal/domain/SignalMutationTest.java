@@ -1,5 +1,6 @@
 package com.sonulim.domain.signal.domain;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -80,5 +81,29 @@ class SignalMutationTest {
 		assertThat(signal.getDescription()).isEqualTo("새 설명");
 		assertThat(signal.getCategory()).isEqualTo(SignalCategory.EMERGENCY);
 		assertThat(signal.getIcon()).isEqualTo("new-icon");
+	}
+
+	@Test
+	void markingPracticedSetsTheTimestamp() {
+		Signal signal = Signal.createCustom(linkId, "이름", null, SignalCategory.CHECK, "icon",
+				List.of(RhythmBeat.SHORT, RhythmBeat.LONG));
+		LocalDateTime practicedAt = LocalDateTime.of(2026, 11, 15, 10, 0);
+
+		signal.markPracticed(practicedAt);
+
+		assertThat(signal.isPracticed()).isTrue();
+		assertThat(signal.getPracticedAt()).isEqualTo(practicedAt);
+	}
+
+	@Test
+	void updatingRhythmResetsPracticedState() {
+		Signal signal = Signal.createCustom(linkId, "이름", null, SignalCategory.CHECK, "icon",
+				List.of(RhythmBeat.SHORT, RhythmBeat.LONG));
+		signal.markPracticed(LocalDateTime.of(2026, 11, 15, 10, 0));
+
+		signal.updateRhythm(List.of(RhythmBeat.LONG, RhythmBeat.LONG, RhythmBeat.SHORT));
+
+		assertThat(signal.isPracticed()).isFalse();
+		assertThat(signal.getPracticedAt()).isNull();
 	}
 }

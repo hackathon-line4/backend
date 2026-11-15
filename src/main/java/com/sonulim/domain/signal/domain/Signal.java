@@ -124,6 +124,10 @@ public class Signal extends BaseEntity {
 		return practicedAt != null;
 	}
 
+	public void markPracticed(LocalDateTime at) {
+		this.practicedAt = at;
+	}
+
 	/**
 	 * 기본 신호(SignalSource.TEMPLATE)는 이름·리듬을 바꿀 수 없다(SIGNAL_NOT_EDITABLE,
 	 * 에러 코드 설명 그대로). 설명·카테고리·아이콘은 기본 신호도 바꿀 수 있다.
@@ -133,10 +137,15 @@ public class Signal extends BaseEntity {
 		this.name = name;
 	}
 
+	/**
+	 * 리듬이 바뀌면 연습 상태를 '연습 전'으로 되돌린다 — 바뀐 리듬은 아직 당사자에게
+	 * 전달된 적이 없다(기획 확정, 이슈 #60).
+	 */
 	public void updateRhythm(List<RhythmBeat> rhythm) {
 		requireEditable();
 		this.rhythm = List.copyOf(rhythm);
 		this.pulses = RhythmBeat.toPulses(rhythm);
+		this.practicedAt = null;
 	}
 
 	public void updateDescription(String description) {
