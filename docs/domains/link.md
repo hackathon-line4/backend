@@ -91,7 +91,6 @@
 - **연결 확인 이벤트 범위 (#108)**: `connection_check.updated`는 시간 안에 온 ack(`CONFIRMED`)에만 보낸다(팀 결정).
   - 시간 초과로 `UNCONFIRMED`가 될 때는 보내지 않는다 — 지금은 요청·ack·조회 때 판정(`resolveIfDue`)이라 정확히 30초에 나갈 수 없다. 타이머 작업(후속 작업) 때 함께 붙인다. 그때까지 앱은 `timeoutAt` 카운트다운이나 결과 조회로 판단한다.
   - 늦은 ack(`LATE`)는 확인 결과가 `UNCONFIRMED` 그대로라 보내지 않는다(연결의 `lastConfirmedAt`만 갱신).
-- **연결 확인 푸시의 iOS 백그라운드 전달 (#108)**: `FcmPushSender`는 모든 종류를 data-only + Android high priority로 보내고 `ApnsConfig`가 없다. iOS 앱이 백그라운드·종료 상태면 `content-available` 없는 data-only 메시지로는 깨어나지 않아, `CONNECTION_CHECK`를 받자마자 ack하는 흐름이 iOS에서는 앱이 열려 있을 때만 동작할 수 있다(`LOCATION_REQUEST`도 같음). global/push 담당(조한결) 확인 필요 — #108은 `FcmPushSender`를 건드리지 않았다.
 - **연결 확인 명세 해석 (#43)**: 아래는 명세 문장을 이렇게 해석해 구현했다(팀 확인). — 프론트 확인 필요.
   - "요청한 사람이 아닌 쪽만" ack — 요청한 사람 본인의 ack는 404 `NOT_FOUND`(명세 오류 목록에 404만 있음).
   - 타임아웃 뒤에 온 ack — 확인 결과는 `UNCONFIRMED`·`confirmedAt: null` 그대로, 연결 상태도 `UNCONFIRMED` 그대로 두고 `lastConfirmedAt`만 갱신(명세에 "lastConfirmedAt은 갱신"만 있음).
